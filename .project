@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <projectDescription>
-  <name>scalastuff.scalabeans</name>
-  <comment>scalastuff.scalabeans 0.1</comment>
+  <name>scalabeans</name>
+  <comment>scalabeans 0.1</comment>
   <projects></projects>
   <buildSpec>
     <buildCommand>
