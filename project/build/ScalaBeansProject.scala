@@ -1,5 +1,6 @@
 import sbt._
 import de.element34.sbteclipsify._
+  import xml.{Elem,Node,NodeSeq,Text}
 
 class ScalaBeansProject(info:ProjectInfo) extends DefaultProject(info) with Eclipsify {
 
@@ -9,7 +10,7 @@ class ScalaBeansProject(info:ProjectInfo) extends DefaultProject(info) with Ecli
   // dependencies
   val paranamer = "com.thoughtworks.paranamer" % "paranamer" % "2.3" withSources()
   val protostuffApi = "com.dyuproject.protostuff" % "protostuff-api" % "1.0.0" withSources()
-  val protostuffCore = "com.dyuproject.protostuff" % "protostuff-core" % "1.0.0" withSources()
+  val protostuffCore = "com.dyuproject.protostuff" % "protostuff-core" % "1.0.0" withSources() 
   val protostuffRuntime = "com.dyuproject.protostuff" % "protostuff-runtime" % "1.0.0" withSources()
   val protostuffJson = "com.dyuproject.protostuff" % "protostuff-json" % "1.0.0" withSources()
   val junit = "junit" % "junit" % "4.8" % "test" withSources()
@@ -20,4 +21,13 @@ class ScalaBeansProject(info:ProjectInfo) extends DefaultProject(info) with Ecli
   // publishing
   override def managedStyle = ManagedStyle.Maven
   val publishTo = Resolver.file("maven-local", Path.userHome / ".m2scalastuff" /  "repository" asFile)
+  
+  override def pomPostProcess(node : Node) : Node = node match {
+    case e : Elem =>
+ 		  val children = if ((e \ "groupId").text == "com.dyuproject.protostuff") e.child ++ <optional>true</optional>
+ 		  else if ((e \ "groupId").text == "org.scala-lang") e.child.filter(_.label!="scope") ++ <scope>provided</scope>
+ 		  else e.child.map(pomPostProcess)
+    	Elem(e.prefix, e.label, e.attributes, e.scope, children:_*)
+    case xml => xml
+  }
 }
