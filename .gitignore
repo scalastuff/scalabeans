@@ -1,5 +1,7 @@
 /target
 /.scala_dependencies
 /.classpath
-/pom.xml
 /lib_managed
+/bin
+/pom.xml
+/mavenrepo

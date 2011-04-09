@@ -11,16 +11,19 @@ class ScalaBeansProject(info:ProjectInfo) extends DefaultProject(info) with Ecli
   val paranamer = "com.thoughtworks.paranamer" % "paranamer" % "2.3" withSources()
   val protostuffApi = "com.dyuproject.protostuff" % "protostuff-api" % "1.0.0" withSources()
   val protostuffCore = "com.dyuproject.protostuff" % "protostuff-core" % "1.0.0" withSources() 
-  val protostuffRuntime = "com.dyuproject.protostuff" % "protostuff-runtime" % "1.0.0" withSources()
-  val protostuffJson = "com.dyuproject.protostuff" % "protostuff-json" % "1.0.0" withSources()
   val junit = "junit" % "junit" % "4.8" % "test" withSources()
 
 	// documentation
 	override def documentOptions = List(LinkSource)
+	
+	// publish sources	 
+  override def packageSrcJar= defaultJarPath("-sources.jar")
+  val sourceArtifact = Artifact.sources(artifactID)
+  override def packageToPublishActions = super.packageToPublishActions ++ Seq(packageSrc)
   
   // publishing
   override def managedStyle = ManagedStyle.Maven
-  val publishTo = Resolver.file("maven-local", Path.userHome / ".m2scalastuff" /  "repository" asFile)
+  val publishTo = Resolver.file("maven-local", "mavenrepo" /  "releases" asFile)
   
   override def pomPostProcess(node : Node) : Node = node match {
     case e : Elem =>
