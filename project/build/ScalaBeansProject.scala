@@ -16,7 +16,7 @@
 
 import sbt._
 import de.element34.sbteclipsify._
-  import xml.{Elem,Node,NodeSeq,Text}
+import xml.{Elem,Node,NodeSeq,Text}
 
 class ScalaBeansProject(info:ProjectInfo) extends DefaultProject(info) with Eclipsify {
 
@@ -29,33 +29,51 @@ class ScalaBeansProject(info:ProjectInfo) extends DefaultProject(info) with Ecli
   val protostuffCore = "com.dyuproject.protostuff" % "protostuff-core" % "1.0.0" withSources() 
   val junit = "junit" % "junit" % "4.8" % "test" withSources()
 
-	// documentation
-	override def documentOptions = List(LinkSource)
-	
-	// publish sources	 
+	// publish sources
+  override def packageDocsJar = defaultJarPath("-javadoc.jar")
   override def packageSrcJar= defaultJarPath("-sources.jar")
   val sourceArtifact = Artifact.sources(artifactID)
-  override def packageToPublishActions = super.packageToPublishActions ++ Seq(packageSrc)
+  val docsArtifact = Artifact.javadoc(artifactID)
+  override def packageToPublishActions = super.packageToPublishActions ++ Seq(packageSrc, packageDocs)
   
   // publishing
   override def managedStyle = ManagedStyle.Maven
-  val publishTo = Resolver.file("maven-local", "mavenrepo" /  "releases" asFile)
+  val publishTo = Resolver.file("maven-local", new java.io.File("../../maven"))
 
   override def pomExtra =
+    <name>ScalaBeans</name> ++
+    <description>Reflection toolkit for Scala</description> ++
+    <url>http://scalastuff.org</url> ++
     <licenses>
       <license>
-        <name>Apache License 2.0</name>
+        <name>The Apache Software License, Version 2.0</name>
         <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
         <distribution>repo</distribution>
       </license>
-    </licenses>
+    </licenses> ++
+    <scm>
+      <connection>scm:git:git@github.com:scalastuff/scalabeans.git</connection>
+      <url>https://github.com/scalastuff/scalabeans</url>
+    </scm> ++
+    <developers>
+      <developer>
+        <id>rditerwich</id>
+        <name>Ruud Diterwich</name>
+      </developer>
+      <developer>
+        <id>advorkovyy</id>
+        <name>Alexander Dvorkovyy</name>
+      </developer>
+    </developers>
+
+  override def pomIncludeRepository(repo: MavenRepository) = false
 
   override def pomPostProcess(node : Node) : Node = node match {
     case e : Elem =>
- 		  val children = if ((e \ "groupId").text == "com.dyuproject.protostuff") e.child ++ <optional>true</optional>
- 		  else if ((e \ "groupId").text == "org.scala-lang") e.child.filter(_.label!="scope") ++ <scope>provided</scope>
- 		  else e.child.map(pomPostProcess)
-    	Elem(e.prefix, e.label, e.attributes, e.scope, children:_*)
+      val children = if ((e \ "groupId").text == "com.dyuproject.protostuff") e.child ++ <optional>true</optional>
+      else if ((e \ "groupId").text == "org.scala-lang") e.child.filter(_.label!="scope") ++ <scope>provided</scope>
+      else e.child.map(pomPostProcess)
+      Elem(e.prefix, e.label, e.attributes, e.scope, children:_*)
     case xml => xml
   }
 }
