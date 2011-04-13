@@ -1,0 +1,104 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>org.scalastuff</groupId>
+	<artifactId>scalabeans</artifactId>
+	<packaging>jar</packaging>
+	<version>0.1-SNAPSHOT</version>
+	<name>ScalaBeans</name>
+	<description>Reflection toolkit for Scala</description>
+	<url>http://scalastuff.org</url>
+	<licenses>
+		<license>
+			<name>The Apache Software License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+	<scm>
+		<connection>scm:git:git@github.com:scalastuff/scalabeans.git</connection>
+		<url>https://github.com/scalastuff/scalabeans</url>
+	</scm>
+	<developers>
+		<developer>
+			<id>rditerwich</id>
+			<name>Ruud Diterwich</name>
+		</developer>
+		<developer>
+			<id>advorkovyy</id>
+			<name>Alexander Dvorkovyy</name>
+		</developer>
+	</developers>
+	<build>
+		<sourceDirectory>src/main/scala</sourceDirectory>
+		<testSourceDirectory>src/test/scala</testSourceDirectory>
+		<plugins>
+			<plugin>
+				<groupId>org.scala-tools</groupId>
+				<artifactId>maven-scala-plugin</artifactId>
+				<version>2.15.2</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>compile</goal>
+							<goal>testCompile</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+	<dependencies>
+		<dependency>
+			<groupId>com.dyuproject.protostuff</groupId>
+			<artifactId>protostuff-api</artifactId>
+			<version>1.0.0</version>
+			<scope>compile</scope>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>com.thoughtworks.paranamer</groupId>
+			<artifactId>paranamer</artifactId>
+			<version>2.3</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.dyuproject.protostuff</groupId>
+			<artifactId>protostuff-core</artifactId>
+			<version>1.0.0</version>
+			<scope>compile</scope>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.scala-lang</groupId>
+			<artifactId>scala-library</artifactId>
+			<version>2.8.1</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.8.2</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+	<repositories>
+		<repository>
+			<id>protostuff-repo</id>
+			<name>protostuff-repo</name>
+			<url>http://protostuff.googlecode.com/svn/repos/maven2</url>
+		</repository>
+	</repositories>
+	<distributionManagement>
+		<repository>
+			<id>sonatype-nexus-staging</id>
+			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
+		</repository>
+		<snapshotRepository>
+			<id>sonatype-nexus-snapshots</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+		</snapshotRepository>
+	</distributionManagement>
+</project>
