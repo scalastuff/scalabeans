@@ -260,7 +260,11 @@ object ValueHandler {
       }
     })
 
-    // TODO: Arrays
+    case at@ArrayType(componentType) =>
+      for (valueHandler <- ValueHandler(componentType))
+      yield new ArrayValueHandler(WrappedValueHandler(valueHandler, componentType)) {
+        def newBuilder = at.newArrayBuilder[V].asInstanceOf[CB]
+      }
 
     case OptionType(valueType) =>
       for (valueHandler <- ValueHandler(valueType))
@@ -270,7 +274,7 @@ object ValueHandler {
       case Some(newBuilderFunction) =>
         for (elemValueHandler <- ValueHandler(elementType))
         yield
-          new RepeatedValueHandler(WrappedValueHandler(elemValueHandler, elementType)) {
+          new CollectionValueHandler(WrappedValueHandler(elemValueHandler, elementType)) {
             def newBuilder() = newBuilderFunction().asInstanceOf[CB]
           }
 

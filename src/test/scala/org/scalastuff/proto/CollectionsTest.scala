@@ -20,14 +20,14 @@ import collection.mutable.Buffer
 import org.junit.{Assert, Test}
 import com.dyuproject.protostuff.{ProtobufIOUtil, GraphIOUtil, LinkedBuffer}
 import org.scalastuff.scalabeans.Enum
+import junit.framework.TestCase
 
-class CollectionsTest {
+class CollectionsTest extends TestCase {
   val linkedBuffer = LinkedBuffer.allocate(512)
-
+  val schema = MirrorSchema.schemaOf[Person]
+                                   
   @Test
   def testGraph() {
-    val schema = MirrorSchema.schemaOf[Person]
-
     def checkSerDeser(person: Person) = {
       linkedBuffer.clear()
       val buffer:Array[Byte] = GraphIOUtil.toByteArray(person, schema, linkedBuffer)
@@ -46,8 +46,6 @@ class CollectionsTest {
 
   @Test
   def testProtobuf() {
-    val schema = MirrorSchema.schemaOf[Person]
-
     def checkSerDeser(person: Person) = {
       linkedBuffer.clear()
       val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(person, schema, linkedBuffer)
@@ -69,6 +67,8 @@ class Person {
   var names: Buffer[String] = Buffer()
   var adressPerType = Map[AddressType, Address]()
   var tags = Seq[Option[String]]()
+  var tagsArray = tags.toArray
+  var primitiveArray = Array.ofDim[Int](0)
 
   def set1() = {
     val addr1 = new Address
@@ -90,6 +90,8 @@ class Person {
     )
 
     tags = Seq(None, Some("tag"))
+    tagsArray = tags.toArray
+    primitiveArray = Array(10, 20, 5)
     this
   }
 
@@ -99,6 +101,9 @@ class Person {
     Assert.assertEquals(postAddress, other.postAddress)
     Assert.assertEquals(names, other.names)
     Assert.assertEquals(adressPerType, other.adressPerType)
+    Assert.assertEquals(tags, other.tags)
+    Assert.assertArrayEquals(tagsArray.asInstanceOf[Array[AnyRef]], other.tagsArray.asInstanceOf[Array[AnyRef]])
+    Assert.assertArrayEquals(primitiveArray, other.primitiveArray)
   }
 }
 

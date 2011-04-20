@@ -22,7 +22,6 @@ import com.dyuproject.protostuff.Output
 import com.dyuproject.protostuff.Pipe
 
 abstract class RepeatedValueHandler(val elementValueHandler: ValueHandler) extends ValueHandler {
-  type V = Traversable[elementValueHandler.V]
   type CB = Builder[elementValueHandler.V, V]
 
   override val inlined = true
@@ -31,20 +30,38 @@ abstract class RepeatedValueHandler(val elementValueHandler: ValueHandler) exten
     val builder = newBuilder()
     builder.result()
   }
-  override def isDefaultValue(v: V) = v.isEmpty
+
   
   def readFrom(input: Input) = throw new UnsupportedOperationException("Cannot deserialize collection of collection, use wrapper")
 
   def readElementFrom(input: Input) = elementValueHandler.readFrom(input)
 
-  def writeValueTo(tag: Int, output: Output, value: V, repeated: Boolean) = {
-    require(!repeated, "Collection cannot be serialized inside another collection directly, use wrapper")
-    value foreach (elementValueHandler.writeValueTo(tag, output, _, true))
-  }
 
   def transfer(tag: Int, pipe: Pipe, input: Input, output: Output, repeated: Boolean) {
 	  elementValueHandler.transfer(tag, pipe, input, output, repeated)
   }
 
   def newBuilder(): CB
+}
+
+abstract class CollectionValueHandler(_elementValueHandler: ValueHandler) extends RepeatedValueHandler(_elementValueHandler) {
+  type V = Traversable[elementValueHandler.V]
+
+  override def isDefaultValue(v: V) = v.isEmpty
+
+  def writeValueTo(tag: Int, output: Output, value: V, repeated: Boolean) = {
+    require(!repeated, "Collection cannot be serialized inside another collection directly, use wrapper")
+    value foreach (elementValueHandler.writeValueTo(tag, output, _, true))
+  }
+}
+
+abstract class ArrayValueHandler(_elementValueHandler: ValueHandler) extends RepeatedValueHandler(_elementValueHandler) {
+  type V = Array[elementValueHandler.V]
+
+  override def isDefaultValue(v: V) = v.length == 0
+
+  def writeValueTo(tag: Int, output: Output, value: V, repeated: Boolean) = {
+    require(!repeated, "Array cannot be serialized inside another inlined type directly, use wrapper")
+    value foreach (elementValueHandler.writeValueTo(tag, output, _, true))
+  }
 }

@@ -17,17 +17,19 @@
 package org.scalastuff.proto
 package value
 
-import com.dyuproject.protostuff.{Pipe, Input, Output}
+import com.dyuproject.protostuff.{ Pipe, Input, Output, Schema }
 import org.scalastuff.scalabeans._
 import org.scalastuff.scalabeans.types._
 import org.scalastuff.scalabeans.Preamble._
+import java.util.concurrent.ConcurrentHashMap
+import java.lang.ref.WeakReference
 
 abstract class BeanValueHandler extends ValueHandler {
   type V = AnyRef
 
-  def writeSchema: WriteMirrorSchema[V]
+  protected def writeSchema: Schema[V]
 
-  def readSchema: MirrorSchema[_]
+  protected def readSchema: Schema[_]
 
   override def isDefaultValue(v: V) = false
 
@@ -35,20 +37,61 @@ abstract class BeanValueHandler extends ValueHandler {
     output.writeObject(tag, value, writeSchema, repeated)
   }
 
+  def schemaWriteTo(output: Output, value: V) {
+    writeSchema.writeTo(output, value)
+  }
+
+  def schemaReadFrom(input: Input): V
+}
+
+object BeanValueHandler {
+  private val beanHandlers = new ConcurrentHashMap[ScalaType, WeakReference[BeanValueHandler]]
+
+  def apply(beanType: ScalaType) = {
+    val ref = beanHandlers.get(beanType)
+    var result = if (ref != null) ref.get else null
+    
+    if (result == null) {
+      val beanDescriptor = descriptorOf(beanType)
+      result =
+        if (beanDescriptor.hasImmutableConstructorParameters) new ImmutableBeanValueHandler(beanDescriptor)
+        else new MutableBeanValueHandler(beanType)
+      beanHandlers.put(beanType, new WeakReference(result))
+    }
+    
+    result
+  }
+
+  def register(scalaType: ScalaType, schema: Schema[_]) = beanHandlers.put(scalaType, new WeakReference(new SchemaValueHandler(schema)))
+}
+
+class SchemaValueHandler(schema: Schema[_]) extends BeanValueHandler {
+  def writeSchema = schema.asInstanceOf[Schema[V]]
+  def readSchema = writeSchema
+
+  def defaultValue = writeSchema.newMessage
+
+  def readFrom(input: Input) = input.mergeObject(null, readSchema)
+  def schemaReadFrom(input: Input) = {
+    val result = readSchema.newMessage()
+    readSchema.mergeFrom(input, result)
+    result
+  }
+
+  def transfer(tag: Int, pipe: Pipe, input: Input, output: Output, repeated: Boolean) {
+    throw new UnsupportedOperationException
+  }
+}
+
+trait MirrorSchemaValueHandler extends BeanValueHandler {
+  override protected def writeSchema: WriteMirrorSchema[V]
+
   def transfer(tag: Int, pipe: Pipe, input: Input, output: Output, repeated: Boolean) {
     output.writeObject(tag, pipe, writeSchema.pipeSchema, repeated)
   }
 }
 
-object BeanValueHandler {
-  def apply(beanType: ScalaType) = {
-    val beanDescriptor = descriptorOf(beanType)
-    if (beanDescriptor.hasImmutableConstructorParameters) new ImmutableBeanValueHandler(beanDescriptor)
-    else new MutableBeanValueHandler(beanType)
-  }
-}
-
-class MutableBeanValueHandler(beanType: ScalaType) extends BeanValueHandler {
+class MutableBeanValueHandler(beanType: ScalaType) extends BeanValueHandler with MirrorSchemaValueHandler {
 
   override lazy val writeSchema = MirrorSchema.schemaOf[V](beanType)
 
@@ -60,10 +103,15 @@ class MutableBeanValueHandler(beanType: ScalaType) extends BeanValueHandler {
     value
   }
 
-  def readFrom(input: Input) = input.mergeObject(null, writeSchema)
+  def readFrom(input: Input) = input.mergeObject(null, readSchema)
+  def schemaReadFrom(input: Input) = {
+    val result = readSchema.newMessage()
+    readSchema.mergeFrom(input, result)
+    result
+  }
 }
 
-class ImmutableBeanValueHandler(beanDescriptor: BeanDescriptor) extends BeanValueHandler {
+class ImmutableBeanValueHandler(beanDescriptor: BeanDescriptor) extends BeanValueHandler with MirrorSchemaValueHandler {
   def writeSchema = readSchema.writeSchema
   lazy val readSchema = BeanBuilderSchema(beanDescriptor)
 
@@ -77,6 +125,12 @@ class ImmutableBeanValueHandler(beanDescriptor: BeanDescriptor) extends BeanValu
 
   override def readFrom(input: Input) = {
     val builder = input.mergeObject(null, readSchema)
+    builder.result()
+  }
+
+  def schemaReadFrom(input: Input) = {
+    val builder = readSchema.newMessage
+    readSchema.mergeFrom(input, builder)
     builder.result()
   }
 }

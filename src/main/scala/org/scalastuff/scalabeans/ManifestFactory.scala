@@ -17,7 +17,7 @@
 package org.scalastuff.scalabeans
 
 import reflect.Manifest
-import java.lang.reflect.{TypeVariable, WildcardType, ParameterizedType, Type}
+import java.lang.reflect.{TypeVariable, WildcardType, ParameterizedType, Type, GenericArrayType}
 import org.scalastuff.scalabeans.types.ScalaType
 
 object ManifestFactory {
@@ -37,6 +37,11 @@ object ManifestFactory {
       } else {
         Manifest.classType(manifestOf(pt.getOwnerType), clazz, typeArgs: _*)
       }
+      
+    case at: GenericArrayType =>
+    	val componentManifest = manifestOf(at.getGenericComponentType)
+    	val arrayManifest = componentManifest.arrayManifest // strips component type args off
+    	Manifest.classType(arrayManifest.erasure, componentManifest)
 
     case wt: WildcardType =>
       val upper = wt.getUpperBounds
@@ -59,7 +64,7 @@ object ManifestFactory {
   }
 
   private def fromClass(clazz: Predef.Class[_]): Manifest[_] = clazz match {
-    case java.lang.Byte.TYPE => Manifest.Byte.asInstanceOf[Manifest[_]]
+    case java.lang.Byte.TYPE => Manifest.Byte
     case java.lang.Short.TYPE => Manifest.Short
     case java.lang.Character.TYPE => Manifest.Char
     case java.lang.Integer.TYPE => Manifest.Int

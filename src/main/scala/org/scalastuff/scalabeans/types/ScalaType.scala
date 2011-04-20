@@ -18,7 +18,7 @@ package org.scalastuff.scalabeans
 package types
 
 import scala.reflect.Manifest
-import collection.mutable.Builder
+import collection.mutable.{Builder, ArrayBuilder}
 import collection.generic.{MapFactory, GenericCompanion}
 
 trait ScalaType {
@@ -152,7 +152,14 @@ object EnumType {
 }
 
 // ******* Arrays ******
-// TODO: implement
+trait ArrayType extends AnyRefType with SingleArgument {
+  override def toString() = "Array[" + argument.toString + "]"
+  def newArrayBuilder[A](): ArrayBuilder[A]
+}
+
+object ArrayType {
+	def unapply(t: ArrayType) = Some(t.argument)
+}
 
 // ******* Collections ******
 
@@ -426,6 +433,18 @@ object ScalaType {
   def scalaTypeOf[A](implicit mf: Manifest[A]): ScalaType = {
     def arg(index: Int): ScalaType = if (index < mf.typeArguments.size) scalaTypeOf(mf.typeArguments(index)) else TheAnyRefType
     def argTuple2 = new Impl(classOf[Tuple2[_, _]], arg(0), arg(1)) with TupleType
+    
+    def createArrayType(mf: Manifest[_]) = {
+	  
+	  val contentTypeManifest =
+      if (mf.typeArguments.size > 0) mf.typeArguments(0)
+      else ManifestFactory.manifestOf(mf.erasure.getComponentType)
+
+	  new Impl(mf.erasure, scalaTypeOf(contentTypeManifest)) with ArrayType {
+      def newArrayBuilder[A](): ArrayBuilder[A] = contentTypeManifest.newArrayBuilder().asInstanceOf[ArrayBuilder[A]]
+    }
+	}
+    
     if (classOf[Int] == mf.erasure || classOf[java.lang.Integer] == mf.erasure) IntType
     else if (classOf[Long] == mf.erasure || classOf[java.lang.Long] == mf.erasure) LongType
     else if (classOf[Float] == mf.erasure || classOf[java.lang.Float] == mf.erasure) FloatType
@@ -443,6 +462,7 @@ object ScalaType {
     else if (classOf[scala.Option[_]] == mf.erasure) new Impl(mf.erasure, arg(0)) with OptionType
     else if (classOf[scala.Tuple1[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with TupleType
     else if (classOf[scala.Tuple2[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0), arg(1)) with TupleType
+    else if (mf.erasure.isArray) createArrayType(mf)
     else if (classOf[scala.collection.mutable.LinkedHashMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with LinkedHashMapType
     else if (classOf[scala.collection.immutable.HashMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with ImmutableHashMapType
     else if (classOf[scala.collection.mutable.HashMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with MutableHashMapType
