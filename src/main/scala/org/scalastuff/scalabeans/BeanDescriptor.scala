@@ -36,6 +36,12 @@ trait BeanDescriptor {
       prop => prop.isInstanceOf[ImmutablePropertyDescriptor] && prop.isInstanceOf[ConstructorParameter]
     }
   }
+  
+  lazy val companion : Option[AnyRef] = try {
+    Some(beanType.erasure.getField("MODULE$").get(beanType.erasure))
+  } catch {
+    case e => None
+  }
 
   // TODO: views
 
