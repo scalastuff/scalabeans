@@ -150,6 +150,9 @@ object MirrorSchema {
 
   def schemaOf[T <: AnyRef](beanType: ScalaType) = {
     val beanDescriptor = descriptorOf(beanType)
+    
+    // TODO: exception if there are immutable constructor parameters
+    
     val fields: Seq[MutableMirrorField[T]] = {
       for {
         prop <- beanDescriptor.properties
