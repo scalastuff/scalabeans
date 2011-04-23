@@ -28,6 +28,8 @@ object Preamble {
 
   def descriptorOf(beanType: ScalaType) = BeanIntrospector[AnyRef](beanType)
   
+  def descriptorOf(t: Type) = BeanIntrospector[AnyRef](scalaTypeOf(t))
+  
   def scalaTypeOf[T](implicit mf: Manifest[T]) = ScalaType.scalaTypeOf(mf)
 
   def scalaTypeOf[T](t : Type) = ScalaType.scalaTypeOf(ManifestFactory.manifestOf(t))
