@@ -30,15 +30,15 @@ class ScalaBeansProject(info:ProjectInfo) extends DefaultProject(info) with Ecli
   val junit = "junit" % "junit" % "4.8" % "test" withSources()
 
 	// publish sources
-  override def packageDocsJar = defaultJarPath("-javadoc.jar")
+  //override def packageDocsJar = defaultJarPath("-javadoc.jar")
   override def packageSrcJar= defaultJarPath("-sources.jar")
   val sourceArtifact = Artifact.sources(artifactID)
-  val docsArtifact = Artifact.javadoc(artifactID)
+  //val docsArtifact = Artifact.javadoc(artifactID)
   override def packageToPublishActions = super.packageToPublishActions ++ Seq(packageSrc, packageDocs)
   
   // publishing
   override def managedStyle = ManagedStyle.Maven
-  val publishTo = Resolver.file("maven-local", new java.io.File("../../maven"))
+  val publishTo = Resolver.file("maven-local", new java.io.File(Path.userHome+"/.m2scalastuff/repository"))
 
   override def pomExtra =
     <name>ScalaBeans</name> ++
