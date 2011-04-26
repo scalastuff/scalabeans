@@ -27,7 +27,7 @@ import java.lang.ref.WeakReference
 abstract class BeanValueHandler extends ValueHandler {
   type V = AnyRef
 
-  protected def writeSchema: Schema[V]
+  def writeSchema: Schema[V]
 
   protected def readSchema: Schema[_]
 
@@ -89,7 +89,7 @@ class SchemaValueHandler(schema: Schema[_]) extends BeanValueHandler {
 }
 
 trait MirrorSchemaValueHandler extends BeanValueHandler {
-  override protected def writeSchema: WriteMirrorSchema[V]
+  override def writeSchema: WriteMirrorSchema[V]
 
   def transfer(tag: Int, pipe: Pipe, input: Input, output: Output, repeated: Boolean) {
     output.writeObject(tag, pipe, writeSchema.pipeSchema, repeated)

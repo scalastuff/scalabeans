@@ -16,32 +16,20 @@
 
 package org.scalastuff.proto
 
-import com.dyuproject.protostuff.{ProtobufIOUtil, LinkedBuffer}
 import org.junit.{Test, Assert}
 
 class ImmutableTest {
-  val linkedBuffer = LinkedBuffer.allocate(512)
+  import TestFormat._
 
   @Test
   def testSimple {
-    val schema = MirrorSchema.schemaOf[ImmutableTestBean]
-
-    def checkSerDeser(ptb: ImmutableTestBean) {
-      linkedBuffer.clear()
-      val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(ptb, schema, linkedBuffer)
-      println("ImmutableTestBean: " + (buffer mkString " "))
-      val deser1 = new ImmutableTestBean()
-      ProtobufIOUtil.mergeFrom(buffer, deser1, schema)
-      ptb.assertEquals(deser1)
-    }
-
-    checkSerDeser(new ImmutableTestBean())
-    checkSerDeser(new ImmutableTestBean().set1())
+    checkFormats(() => new ImmutableTestBean())
   }
 }
 
 case class Immutable(s: String, i: Int)
-class ImmutableTestBean {
+
+class ImmutableTestBean extends TestBean[ImmutableTestBean] {
   var immutableBean = Immutable("", 0)
   var tuple = (0, "")
 

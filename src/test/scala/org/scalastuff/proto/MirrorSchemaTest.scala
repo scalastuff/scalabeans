@@ -23,120 +23,47 @@ import org.junit.{Assert, Test}
 class MirrorSchemaTest {
   val linkedBuffer = LinkedBuffer.allocate(512)
 
+  import TestFormat._
+
   @Test
   def testEmptyBean {
-    linkedBuffer.clear()
-    val schema = MirrorSchema.schemaOf[EmptyTestBean]
-    val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(new EmptyTestBean(), schema, linkedBuffer)
-    println(buffer mkString " ")
-    ProtobufIOUtil.mergeFrom(buffer, new EmptyTestBean(), schema)
+    checkSerDeserFormats(new EmptyTestBean) {_ == _}
   }
 
   @Test
   def testPrimitiveTypes {
-    val schema = MirrorSchema.schemaOf[PrimitiveTypesBean]
-
-    def checkSerDeser(ptb: PrimitiveTypesBean) {
-      linkedBuffer.clear()
-      val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(ptb, schema, linkedBuffer)
-      println("PrimitiveTypesBean: " + (buffer mkString " "))
-      val deser1 = new PrimitiveTypesBean()
-      ProtobufIOUtil.mergeFrom(buffer, deser1, schema)
-      ptb.assertEquals(deser1)
-    }
-
-    checkSerDeser(new PrimitiveTypesBean())
-    checkSerDeser(new PrimitiveTypesBean().set1())
+    checkFormats(() => new PrimitiveTypesBean())
   }
 
   @Test
   def testSimpleTypes {
-    val schema = MirrorSchema.schemaOf[SimpleTypesBean]
-
-    def checkSerDeser(stb: SimpleTypesBean) {
-      linkedBuffer.clear()
-      val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(stb, schema, linkedBuffer)
-      println("SimpleTypesBean: " + (buffer mkString " "))
-      val deser1 = new SimpleTypesBean()
-      ProtobufIOUtil.mergeFrom(buffer, deser1, schema)
-      stb.assertEquals(deser1)
-    }
-
-    checkSerDeser(new SimpleTypesBean())
-    checkSerDeser(new SimpleTypesBean().set1())
+    checkFormats(() => new SimpleTypesBean())
   }
 
   @Test
   def testOption {
-    val schema = MirrorSchema.schemaOf[OptionTestBean]
-
-    def checkSerDeser(stb: OptionTestBean) {
-      linkedBuffer.clear()
-      val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(stb, schema, linkedBuffer)
-      println("OptionTestBean: " + (buffer mkString " "))
-      val deser1 = new OptionTestBean()
-      ProtobufIOUtil.mergeFrom(buffer, deser1, schema)
-      stb.assertEquals(deser1)
-    }
-
-    checkSerDeser(new OptionTestBean())
-    checkSerDeser(new OptionTestBean().set1())
+    checkFormats(() => new OptionTestBean())
   }
 
   @Test
   def testEnum {
-    val schema = MirrorSchema.schemaOf[EnumTestBean]
-
-    def checkSerDeser(etb: EnumTestBean) {
-      linkedBuffer.clear()
-      val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(etb, schema, linkedBuffer)
-      println("EnumTestBean: " + (buffer mkString " "))
-      val deser1 = new EnumTestBean()
-      ProtobufIOUtil.mergeFrom(buffer, deser1, schema)
-      etb.assertEquals(deser1)
-    }
-
-    checkSerDeser(new EnumTestBean())
-    checkSerDeser(new EnumTestBean().set1())
+    checkFormats(() => new EnumTestBean())
   }
 
   @Test
   def testOptional {
-    val schema = MirrorSchema.schemaOf[OptionalTestBean]
-
-    def checkSerDeser(stb: OptionalTestBean) {
-      linkedBuffer.clear()
-      val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(stb, schema, linkedBuffer)
-      println("OptionalTestBean: " + (buffer mkString " "))
-      val deser1 = new OptionalTestBean()
-      ProtobufIOUtil.mergeFrom(buffer, deser1, schema)
-      stb.assertEquals(deser1)
-    }
-
-    checkSerDeser(new OptionalTestBean())
-    checkSerDeser(new OptionalTestBean().set1())
+    checkFormats(() => new OptionalTestBean())
   }
 
   @Test
   def testCompositeBean {
-    val schema = MirrorSchema.schemaOf[CompositeTestBean]
-
-    def checkSerDeser(ptb: CompositeTestBean) {
-      linkedBuffer.clear()
-      val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(ptb, schema, linkedBuffer)
-      println("CompositeTestBean: " + (buffer mkString " "))
-      val deser1 = new CompositeTestBean()
-      ProtobufIOUtil.mergeFrom(buffer, deser1, schema)
-    }
-
-    checkSerDeser(new CompositeTestBean())
-    checkSerDeser(new CompositeTestBean().set1())
+    checkFormats(() => new CompositeTestBean())
   }
 }
 
 class EmptyTestBean
 
-class PrimitiveTypesBean {
+class PrimitiveTypesBean extends TestBean[PrimitiveTypesBean] {
   var bt: Byte = _
   var s: Short = _
   var i: Int = _
@@ -170,7 +97,7 @@ class PrimitiveTypesBean {
   }
 }
 
-class SimpleTypesBean {
+class SimpleTypesBean extends TestBean[SimpleTypesBean] {
   var s:String = ""
   var bd:BigDecimal = 0
   var bi:BigInt = 0
@@ -189,7 +116,7 @@ class SimpleTypesBean {
   }
 }
 
-class OptionTestBean {
+class OptionTestBean extends TestBean[OptionTestBean] {
   var p: Option[Int] = None
   var r1: Option[String] = None
   var r2: Option[String] = None
@@ -215,7 +142,7 @@ object Gender extends Enum[Gender] {
   val F = new Gender
 }
 
-class EnumTestBean {
+class EnumTestBean extends TestBean[EnumTestBean] {
   var e: Gender = Gender.Unknown
 
   def set1() = {
@@ -228,7 +155,7 @@ class EnumTestBean {
   }
 }
 
-class OptionalTestBean {
+class OptionalTestBean extends TestBean[OptionalTestBean] {
   var bt: Byte = 1
   var s: Short = 2
   var i: Int = 3
@@ -293,7 +220,7 @@ class OptionalTestBean {
   }
 }
 
-class CompositeTestBean {
+class CompositeTestBean extends TestBean[CompositeTestBean] {
   var e: EmptyTestBean = new EmptyTestBean
   var pbt: PrimitiveTypesBean = new PrimitiveTypesBean
   var stp: SimpleTypesBean = new SimpleTypesBean

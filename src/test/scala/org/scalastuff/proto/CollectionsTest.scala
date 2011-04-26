@@ -18,11 +18,13 @@ package org.scalastuff.proto
 
 import collection.mutable.Buffer
 import org.junit.{Assert, Test}
-import com.dyuproject.protostuff.{ProtobufIOUtil, GraphIOUtil, LinkedBuffer}
+import com.dyuproject.protostuff.{GraphIOUtil, LinkedBuffer}
 import org.scalastuff.scalabeans.Enum
 import junit.framework.TestCase
 
 class CollectionsTest extends TestCase {
+  import TestFormat._
+
   val linkedBuffer = LinkedBuffer.allocate(512)
   val schema = MirrorSchema.schemaOf[Person]
                                    
@@ -45,22 +47,12 @@ class CollectionsTest extends TestCase {
   }
 
   @Test
-  def testProtobuf() {
-    def checkSerDeser(person: Person) = {
-      linkedBuffer.clear()
-      val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(person, schema, linkedBuffer)
-      println("Person: " + (buffer mkString " "))
-      val deser1 = new Person()
-      ProtobufIOUtil.mergeFrom(buffer, deser1, schema)
-      person.assertEquals(deser1)
-    }
-
-    checkSerDeser(new Person())
-    checkSerDeser(new Person().set1())
+  def testFormats() {
+    checkFormats(() => new Person())
   }
 }
 
-class Person {
+class Person extends TestBean[Person] {
   var homeAddress: Address = new Address
   var adresses: List[Address] = Nil
   var postAddress: Address = new Address

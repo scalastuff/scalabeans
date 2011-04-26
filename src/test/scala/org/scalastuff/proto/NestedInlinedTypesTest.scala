@@ -17,31 +17,18 @@
 package org.scalastuff.proto
 
 import org.junit.{Test, Assert}
-import com.dyuproject.protostuff.{LinkedBuffer, GraphIOUtil, ProtobufIOUtil}
 
 class NestedInlinedTypesTest {
-  val linkedBuffer = LinkedBuffer.allocate(512)
+  import TestFormat._
 
   @Test
   def testSimple() {
-    val schema = MirrorSchema.schemaOf[NestedInlinedTestBean]
-
-    def checkSerDeser(nitb: NestedInlinedTestBean) = {
-      linkedBuffer.clear()
-      val buffer:Array[Byte] = ProtobufIOUtil.toByteArray(nitb, schema, linkedBuffer)
-      println("NestedInlinedTestBean: " + (buffer mkString " "))
-      val deser1 = new NestedInlinedTestBean()
-      ProtobufIOUtil.mergeFrom(buffer, deser1, schema)
-      nitb.assertEquals(deser1)
-    }
-
-    checkSerDeser(new NestedInlinedTestBean())
-    checkSerDeser(new NestedInlinedTestBean().set1())
+    checkFormats(() => new NestedInlinedTestBean())
   }
 }
 
 
-class NestedInlinedTestBean {
+class NestedInlinedTestBean extends TestBean[NestedInlinedTestBean] {
   var lo = List[Option[String]]()
   var ol: Option[List[String]] = None
   var l3 = List[List[List[String]]]()

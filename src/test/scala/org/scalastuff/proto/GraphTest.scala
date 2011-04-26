@@ -16,11 +16,10 @@
 
 package org.scalastuff.proto
 
-import com.dyuproject.protostuff.{LinkedBuffer, GraphIOUtil}
 import org.junit.{Assert, Test}
+import Preamble._
 
 class GraphTest {
-  val linkedBuffer = LinkedBuffer.allocate(512)
 
   @Test
   def testSimpleCase() {
@@ -30,12 +29,12 @@ class GraphTest {
     wrapper.one.two = wrapper.two
     wrapper.two.one = wrapper.one
 
-    val schema = MirrorSchema.schemaOf[Wrapper]
+    val reader = readerOf[Wrapper]
+    val writer = writerOf[Wrapper]
 
-    linkedBuffer.clear()
-    val buffer = GraphIOUtil.toByteArray(wrapper, schema, linkedBuffer)
-    val deser = new Wrapper
-    GraphIOUtil.mergeFrom(buffer, deser, schema)
+    val buffer = writer.toByteArray(wrapper, GraphProtostuffFormat)
+    println("Wrapper graph: " + (buffer mkString " "))
+    val deser = reader.readFrom(buffer, GraphProtostuffFormat)
 
     Assert.assertSame(deser.two, deser.one.two)
     Assert.assertSame(deser.one, deser.two.one)
