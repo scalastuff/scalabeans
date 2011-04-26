@@ -113,12 +113,12 @@ object Loan {
    * }
    * }}}
    */
-  def closeOnException[A](r: Closeable)(f: => A) = {
+  def closeOnException[A](rs: Closeable*)(f: => A) = {
     try {
       f
     } catch {
       case e: Exception =>
-        close(r)
+        rs foreach close
         throw e
     }
   }
