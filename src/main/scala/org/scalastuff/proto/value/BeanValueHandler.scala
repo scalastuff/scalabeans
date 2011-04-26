@@ -37,24 +37,29 @@ abstract class BeanValueHandler extends ValueHandler {
     output.writeObject(tag, value, writeSchema, repeated)
   }
 
-  def schemaWriteTo(output: Output, value: V) {
+  def beanWriteTo(output: Output, value: V) {
     writeSchema.writeTo(output, value)
   }
 
-  def schemaReadFrom(input: Input): V
+  def beanReadFrom(input: Input): V
 }
 
 object BeanValueHandler {
   private val beanHandlers = new ConcurrentHashMap[ScalaType, WeakReference[BeanValueHandler]]
 
-  def apply(beanType: ScalaType) = {
+  def apply[B <: AnyRef]()(implicit mf: Manifest[B]): BeanValueHandler = {
+    val scalaType = scalaTypeOf[B]
+    apply(scalaType)
+  }
+  
+  def apply(beanType: ScalaType): BeanValueHandler = {
     val ref = beanHandlers.get(beanType)
     var result = if (ref != null) ref.get else null
     
     if (result == null) {
       val beanDescriptor = descriptorOf(beanType)
       result =
-        if (beanDescriptor.hasImmutableConstructorParameters) new ImmutableBeanValueHandler(beanDescriptor)
+        if (beanDescriptor.needsBeanBuilder) new ImmutableBeanValueHandler(beanDescriptor)
         else new MutableBeanValueHandler(beanType)
       beanHandlers.put(beanType, new WeakReference(result))
     }
@@ -72,7 +77,7 @@ class SchemaValueHandler(schema: Schema[_]) extends BeanValueHandler {
   def defaultValue = writeSchema.newMessage
 
   def readFrom(input: Input) = input.mergeObject(null, readSchema)
-  def schemaReadFrom(input: Input) = {
+  def beanReadFrom(input: Input) = {
     val result = readSchema.newMessage()
     readSchema.mergeFrom(input, result)
     result
@@ -104,7 +109,7 @@ class MutableBeanValueHandler(beanType: ScalaType) extends BeanValueHandler with
   }
 
   def readFrom(input: Input) = input.mergeObject(null, readSchema)
-  def schemaReadFrom(input: Input) = {
+  def beanReadFrom(input: Input) = {
     val result = readSchema.newMessage()
     readSchema.mergeFrom(input, result)
     result
@@ -128,7 +133,7 @@ class ImmutableBeanValueHandler(beanDescriptor: BeanDescriptor) extends BeanValu
     builder.result()
   }
 
-  def schemaReadFrom(input: Input) = {
+  def beanReadFrom(input: Input) = {
     val builder = readSchema.newMessage
     readSchema.mergeFrom(input, builder)
     builder.result()

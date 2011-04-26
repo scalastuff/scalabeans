@@ -34,7 +34,7 @@ class BeanValueHandlerTest {
     Assert.assertTrue(p1.isInstanceOf[ConstructorParameter])
     Assert.assertEquals(StringType, p1.scalaType)
 
-    Assert.assertTrue(bd.hasImmutableConstructorParameters)
+    Assert.assertTrue(bd.needsBeanBuilder)
     Assert.assertTrue(vh.isInstanceOf[ImmutableBeanValueHandler])
 
     val ivh = new ImmutableBeanValueHandler(bd)

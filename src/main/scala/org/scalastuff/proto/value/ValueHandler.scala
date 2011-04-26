@@ -242,7 +242,7 @@ object ValueHandler {
     case EnumType(enum) => Some(new ValueHandler {
       type V = AnyRef
 
-      val defaultValue: V = enum.values.head
+      val defaultValue: V = enum.values.head.constant
 
       override def isDefaultValue(v: V) = false
 

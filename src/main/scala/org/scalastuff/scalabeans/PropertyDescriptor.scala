@@ -16,7 +16,7 @@
 
 package org.scalastuff.scalabeans
 
-import java.lang.reflect.{AnnotatedElement, Modifier, Method, Field}
+import java.lang.reflect.{ AnnotatedElement, Modifier, Method, Field }
 import Preamble._
 import org.scalastuff.scalabeans.types._
 
@@ -62,7 +62,11 @@ trait MutablePropertyDescriptor extends DeserializablePropertyDescriptor {
 }
 
 trait ConstructorParameter extends DeserializablePropertyDescriptor {
-
+  /**
+   * Default value as defined in constructor.
+   * 
+   * Actually it can be dynamic, so it is a function, not a value. 
+   */
   def defaultValue: Option[() => Any]
 
 }
@@ -72,9 +76,9 @@ object PropertyDescriptor {
     trait ConstructorParameterImpl extends ConstructorParameter {
       val index = ctorParameterIndex
 
-      def defaultValue = defaultValueMethod map {
-        method => {
-          () => method.invoke(null)
+      def defaultValue = defaultValueMethod map { method =>
+        { () =>
+          method.invoke(null)
         }
       }
     }
@@ -177,7 +181,7 @@ object PropertyDescriptor {
       case _ => None
     }
 
-    ((field, getter, setter) : @unchecked) match {
+    ((field, getter, setter): @unchecked) match {
       case (Some(f), None, None) =>
         if (Modifier.isFinal(f.getModifiers)) immutableFieldPropertyDescriptor(f, propertyTypeHint, ctorParameterIndex, defaultValueMethod)
         else mutableFieldPropertyDescriptor(f, ctorParameterIndex, defaultValueMethod)
