@@ -51,7 +51,7 @@ object TestFormat {
 
     val bufferStr = format match {
       case _: JsonFormat | _: XmlFormat.type => new String(buffer, Charset.forName("UTF-8"))
-      case _ => buffer map (_ .toHexString) mkString " "
+      case _ => buffer map ("%02X" format _) mkString " "
     }
 
     println("%s (%s), %d bytes: %s".format(

@@ -16,13 +16,11 @@
 
 package org.scalastuff.scalabeans
 
-import scala.collection.Seq
-
 object Enum {
-	def enumOf[C <: AnyRef](constantClass : Class[_]) : Option[Enum[C]] = try {
-		val companionClass = constantClass.getClassLoader.loadClass(constantClass.getName + "$")
-		if (classOf[Enum[C]].isAssignableFrom(companionClass)) {
-			Some(companionClass.getField("MODULE$").get(null).asInstanceOf[Enum[C]])
+	def enumOf[V <: AnyRef](valueClass : Class[_]) : Option[Enum[V]] = try {
+		val companionClass = valueClass.getClassLoader.loadClass(valueClass.getName + "$")
+		if (classOf[Enum[V]].isAssignableFrom(companionClass)) {
+			Some(companionClass.getField("MODULE$").get(null).asInstanceOf[Enum[V]])
 		} else None
 	} catch {
 		case _ => None
@@ -30,18 +28,25 @@ object Enum {
 	def enumOf[C <: AnyRef](constant : C) : Option[Enum[C]] = enumOf[C](constant.getClass)
 }
 
-abstract class Enum[C <: AnyRef](implicit mf: Manifest[C]) {
+abstract class Enum[V <: AnyRef](implicit mf: Manifest[V]) {
 
-	private var explicitOrdinals = Seq[(C,Int)]()
-	private var explicitNames = Seq[(C,String)]()
+	private var explicitOrdinals = Seq[(V,Int)]()
+	private var explicitNames = Seq[(V,String)]()
 	
-	lazy val values : List[EnumValue[C]] = {
+	lazy val values : Seq[V] = wrappers.map(_.value)
+	lazy val names : Seq[String] = wrappers.map(_.name)
+	lazy val ordinals : Seq[Int] = wrappers.map(_.ordinal)
+	lazy val valuesByName : Map[String, V] = wrappers.map(w => (w.name,w.value)).toMap
+	lazy val valuesByOrdinal : Map[Int, V] = wrappers.map(w => (w.ordinal,w.value)).toMap
+	lazy val namesAndOrdinals : Map[V, (String,Int)] = wrappers.map(w => (w.value, (w.name, w.ordinal))).toMap
+	
+	private lazy val wrappers : Seq[EnumValueWrapper[V]] = {
 		var nextOrdinal = 1
-		val values = getClass.getDeclaredFields.toList.
+		val values = getClass.getDeclaredFields.toSeq.
 			filter (f => mf.erasure.isAssignableFrom(f.getType)).
 			map { f =>
 				f.setAccessible(true)
-				val constant = f.get(Enum.this).asInstanceOf[C]
+				val constant = f.get(Enum.this).asInstanceOf[V]
 				val ordinal =  explicitOrdinals.find(_._1 eq constant).map(_._2).getOrElse {
 					while (explicitOrdinals.exists(_._2 == nextOrdinal))
 						nextOrdinal = nextOrdinal + 1
@@ -49,26 +54,28 @@ abstract class Enum[C <: AnyRef](implicit mf: Manifest[C]) {
 				}
 				nextOrdinal = ordinal + 1
 				val name = explicitNames.find(_._1 eq constant).map(_._2).getOrElse(f.getName)
-				EnumValue(Enum.this, name, ordinal, constant)
+				EnumValueWrapper(Enum.this, name, ordinal, constant)
 			}
     values.sortWith(_.ordinal < _.ordinal)
 	}
 	
-	def valueOf(name : String) : Option[EnumValue[C]] = values.find(_.name == name)
-	def valueOf(ordinal : Int) : Option[EnumValue[C]] = values.find(_.ordinal == ordinal)
-	def valueOf(constant : C) : EnumValue[C] = values.find(_.constant == constant).get
-	def nameOf(constant : C) : String = valueOf(constant).name
-	def ordinalOf(constant : C) = valueOf(constant).ordinal
+	def valueOf(name : String) : Option[V] = wrappers.find(_.name == name).map(_.value)
+	def valueOf(ordinal : Int) : Option[V] = wrappers.find(_.ordinal == ordinal).map(_.value)
+	def nameOf(ordinal : Int) : Option[String] = wrappers.find(_.ordinal == ordinal).map(_.name)
+	def nameOf(value : V) : String = wrappers.find(_.value == value).map(_.name).getOrElse(throw new EnumException(value, this))
+	def ordinalOf(name : String) : Option[Int] = wrappers.find(_.name == name).map(_.ordinal)
+	def ordinalOf(value : V) : Int =  wrappers.find(_.value == value).map(_.ordinal).getOrElse(throw new EnumException(value, this))
+	
 	override def toString = "Enum[" + mf.erasure.getSimpleName + "]"
 	
-	protected implicit def explicitOrdinal(constant : C) = new {
+	protected implicit def explicitOrdinal(constant : V) = new {
 		def ordinal(ordinal : Int) = {
 			explicitOrdinals :+= ((constant, ordinal))
 			constant
 		}
 	}
 	
-	protected implicit def explicitName(constant : C) = new {
+	protected implicit def explicitName(constant : V) = new {
 		def name(name : String) = {
 			explicitNames :+= ((constant, name))
 			constant
@@ -76,4 +83,6 @@ abstract class Enum[C <: AnyRef](implicit mf: Manifest[C]) {
 	}
 }
 
-final case class EnumValue[C <: AnyRef] private[scalabeans] (enum : Enum[C], name : String, ordinal : Int, constant : C)
+private final case class EnumValueWrapper[V <: AnyRef] private[scalabeans] (enum : Enum[V], name : String, ordinal : Int, value : V)
+
+class EnumException(value : AnyRef, enum : Enum[_]) extends RuntimeException("'%s' is not a value of enum '%s'".format(value, enum))

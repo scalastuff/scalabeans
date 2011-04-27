@@ -33,10 +33,10 @@ case class EnumTestBean(var color : Color = Color.red)
 class EnumTest {
 	@Test
 	def testEnumValues {
-		println("Enum value names: " + Color.values.map(_.name))
-		assertEquals(Seq("blue", "yel", "red"), Color.values.map(_.name))
-		println("Enum value ordinals: " + Color.values.map(_.ordinal))
-		assertEquals(Seq(4, 5, 6), Color.values.map(_.ordinal))
+		println("Enum value names: " + Color.names)
+		assertEquals(Seq("blue", "yel", "red"), Color.names)
+		println("Enum value ordinals: " + Color.ordinals)
+		assertEquals(Seq(4, 5, 6), Color.ordinals)
 	}
 	
 	@Test

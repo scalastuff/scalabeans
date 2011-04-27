@@ -242,17 +242,17 @@ object ValueHandler {
     case EnumType(enum) => Some(new ValueHandler {
       type V = AnyRef
 
-      val defaultValue: V = enum.values.head.constant
+      val defaultValue: V = enum.values.head
 
       override def isDefaultValue(v: V) = false
 
       def readFrom(input: Input) = {
         val ordinal = input.readInt32()
-        enum.valueOf(ordinal) map (_.constant) getOrElse error("Cannot read enum value of %s: unknown ordinal %d".format(enum.toString, ordinal))
+        enum.valueOf(ordinal) getOrElse error("Cannot read enum value of %s: unknown ordinal %d".format(enum.toString, ordinal))
       }
 
       def writeValueTo(tag: Int, output: Output, value: V, repeated: Boolean) = {
-        output.writeInt32(tag, enum.valueOf(value) ordinal, repeated)
+        output.writeInt32(tag, enum.ordinalOf(value), repeated)
       }
 
       def transfer(tag: Int, pipe: Pipe, input: Input, output: Output, repeated: Boolean) {
