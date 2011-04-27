@@ -31,7 +31,10 @@
 			<name>Alexander Dvorkovyy</name>
 		</developer>
 	</developers>
-	<build>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+ 	<build>
 		<sourceDirectory>src/main/scala</sourceDirectory>
 		<testSourceDirectory>src/test/scala</testSourceDirectory>
 		<plugins>
