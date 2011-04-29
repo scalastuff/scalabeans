@@ -83,22 +83,33 @@ object Loan {
    * Ensures all resources are closed after given code block is finished.
    */
   def loan[A](rs: Closeable*)(f: => A): A = {
-    try {
+    val result = try {
       f
-    } finally {
-      rs foreach close
-    }
-  }
-
-  /**
-   * Closes resource. Exceptions are printed to standard output and not re-thrown.
-   */
-  def close(r: Closeable) {
-    try {
-      r.close()
     } catch {
       case e: Exception =>
-        e.printStackTrace()
+        close(rs toList, false)
+        throw e
+    }
+    close(rs toList, true)
+    result
+  }
+
+  private def close(rs: List[Closeable], rethrowCloseException: Boolean) {
+    rs match {
+      case Nil =>
+      case r :: tail =>        
+        try {
+          r.close()
+        } catch {
+          case e: Exception =>
+            if (rethrowCloseException) {
+              close(tail, false)
+	          throw e
+            }            
+            // do we need to print a stack trace at least if exception is not re-thrown?
+        }
+
+        close(tail, rethrowCloseException)
     }
   }
 
@@ -118,7 +129,7 @@ object Loan {
       f
     } catch {
       case e: Exception =>
-        rs foreach close
+        close(rs toList, false)
         throw e
     }
   }
