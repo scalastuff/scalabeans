@@ -108,10 +108,10 @@ class LoanTest {
 
     try {
       loan(res1, res2, res3) {
-        throw new RuntimeException
+        throw new ExecutionBlockException
       }
     } catch {
-      case _:Exception => // yes, this is what we wanted
+      case _:ExecutionBlockException => // yes, this is what we wanted
     }
     assertFalse(opened contains true)
   }
@@ -122,8 +122,12 @@ class LoanTest {
     val (res1, res2, res3) = open(new TestResource(0, opened) {}, new TestCloseExceptionResource(1, opened) {}, new TestResource(2, opened) {})
     assertFalse(opened contains false)
 
-    loan(res1, res2, res3) {
+    try {
+      loan(res1, res2, res3) {
 
+      }
+    } catch {
+      case _:CloseResourceException => // yes, this is what we wanted
     }
     assertFalse(opened contains true)
   }
@@ -136,10 +140,10 @@ class LoanTest {
 
     try {
       loan(res1, res2, res3) {
-        throw new RuntimeException
+        throw new ExecutionBlockException
       }
     } catch {
-      case _:Exception => // yes, this is what we wanted
+      case _:ExecutionBlockException => // yes, this is what we wanted
     }
     assertFalse(opened contains true)
   }
@@ -157,10 +161,12 @@ class LoanTest {
 
     def close() {
       opened(index) = false
-      throw new RuntimeException("can't close")
+      throw new CloseResourceException
     }
   }
 
   class OpenResourceException extends RuntimeException
+  class CloseResourceException extends RuntimeException
+  class ExecutionBlockException extends RuntimeException
   def exceptionOnOpen(): TestResource = throw new OpenResourceException
 }
