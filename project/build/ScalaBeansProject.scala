@@ -27,18 +27,21 @@ class ScalaBeansProject(info:ProjectInfo) extends DefaultProject(info) with Ecli
   val paranamer = "com.thoughtworks.paranamer" % "paranamer" % "2.3" withSources()
   val protostuffApi = "com.dyuproject.protostuff" % "protostuff-api" % "1.0.0" withSources()
   val protostuffCore = "com.dyuproject.protostuff" % "protostuff-core" % "1.0.0" withSources() 
+  val protostuffJson = "com.dyuproject.protostuff" % "protostuff-json" % "1.0.0" withSources() 
+  val protostuffXml = "com.dyuproject.protostuff" % "protostuff-xml" % "1.0.0" withSources() 
   val junit = "junit" % "junit" % "4.8" % "test" withSources()
+  val woodstox = "org.codehaus.woodstox" % "woodstox-core-asl" % "4.1.1"
 
 	// publish sources
-  //override def packageDocsJar = defaultJarPath("-javadoc.jar")
+  override def packageDocsJar = defaultJarPath("-javadoc.jar")
   override def packageSrcJar= defaultJarPath("-sources.jar")
   val sourceArtifact = Artifact.sources(artifactID)
-  //val docsArtifact = Artifact.javadoc(artifactID)
+  val docsArtifact = Artifact.javadoc(artifactID)
   override def packageToPublishActions = super.packageToPublishActions ++ Seq(packageSrc, packageDocs)
   
   // publishing
   override def managedStyle = ManagedStyle.Maven
-  val publishTo = Resolver.file("maven-local", new java.io.File(Path.userHome+"/.m2scalastuff/repository"))
+  val publishTo = Resolver.file("maven-local", new java.io.File(Path.userHome+"/.m2/repository"))
 
   override def pomExtra =
     <name>ScalaBeans</name> ++
