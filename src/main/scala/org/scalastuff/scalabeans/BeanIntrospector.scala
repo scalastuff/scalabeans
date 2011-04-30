@@ -43,13 +43,13 @@ object BeanIntrospector {
     /**
      * Constructor. Secondary constructors are not supported
      */
-    val constructor: Constructor[_] = {
-      require(c.getConstructors().size > 0, c.getName + " has no constructors")
-      c.getConstructors()(0).asInstanceOf[Constructor[_]]
+    val constructor: Option[Constructor[_]] = {
+      if (c.getConstructors().isEmpty) None
+      else Some(c.getConstructors()(0).asInstanceOf[Constructor[_]])
     }
 
     val paranamer = new BytecodeReadingParanamer
-    val ctorParameterNames = paranamer.lookupParameterNames(constructor)
+    val ctorParameterNames = constructor.map(paranamer.lookupParameterNames(_)).getOrElse(scala.Array[String]())
 
     var tag = 0
     var mutablePropertyPosition = 0
