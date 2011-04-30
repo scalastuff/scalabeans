@@ -98,9 +98,12 @@ trait BeanDescriptor {
    * @return bean class companion object (if any defined)
    */
   lazy val companion : Option[AnyRef] = try {
-    Some(beanType.erasure.getField("MODULE$").get(beanType.erasure))
+    val cc = Class.forName(beanType.erasure.getName + "$")
+    Some(cc.getField("MODULE$").get(cc))
   } catch {
-    case e => None
+    case e =>
+      e.printStackTrace
+      None
   }
 
   // TODO: views
