@@ -89,7 +89,7 @@ class SchemaValueHandler(schema: Schema[_]) extends BeanValueHandler {
 }
 
 trait MirrorSchemaValueHandler extends BeanValueHandler {
-  override def writeSchema: WriteMirrorSchema[V]
+  override def writeSchema: WriteBeanSchema[V]
 
   def transfer(tag: Int, pipe: Pipe, input: Input, output: Output, repeated: Boolean) {
     output.writeObject(tag, pipe, writeSchema.pipeSchema, repeated)
@@ -98,7 +98,7 @@ trait MirrorSchemaValueHandler extends BeanValueHandler {
 
 class MutableBeanValueHandler(beanType: ScalaType) extends BeanValueHandler with MirrorSchemaValueHandler {
 
-  override lazy val writeSchema = MirrorSchema.schemaOf[V](beanType)
+  override lazy val writeSchema = BeanSchema.schemaOf[V](beanType)
 
   def readSchema = writeSchema
 

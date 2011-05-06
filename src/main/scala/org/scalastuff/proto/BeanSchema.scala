@@ -22,7 +22,10 @@ import collection.mutable.{ArrayBuffer, Buffer, HashMap}
 import org.scalastuff.scalabeans._
 import org.scalastuff.scalabeans.Preamble._
 
-class WriteMirrorSchema[T <: AnyRef](val beanDescriptor: BeanDescriptor, val fields: Seq[Field[T]]) extends Schema[T] {
+/**
+ * Schema implementation for bean serialization. 
+ */
+class WriteBeanSchema[T <: AnyRef](val beanDescriptor: BeanDescriptor, val fields: Seq[Field[T]]) extends Schema[T] {
 
   def mergeFrom(input: Input, message: T) {
     throw new UnsupportedOperationException
@@ -91,8 +94,8 @@ class WriteMirrorSchema[T <: AnyRef](val beanDescriptor: BeanDescriptor, val fie
 
 }
 
-class MirrorSchema[T <: AnyRef](_beanDescriptor: BeanDescriptor, override val fields: Seq[MutableField[T]])
-  extends WriteMirrorSchema[T](_beanDescriptor, fields) {
+class BeanSchema[T <: AnyRef](_beanDescriptor: BeanDescriptor, override val fields: Seq[MutableField[T]])
+  extends WriteBeanSchema[T](_beanDescriptor, fields) {
 
   override def newMessage = beanDescriptor.newInstance().asInstanceOf[T]
 
@@ -145,8 +148,8 @@ class MirrorSchema[T <: AnyRef](_beanDescriptor: BeanDescriptor, override val fi
   override protected val fieldsByNumber: Seq[Option[MutableField[T]]] = mapFieldsByNumber(fields)
 }
 
-object MirrorSchema {
-  def schemaOf[T <: AnyRef](implicit mf: Manifest[T]): MirrorSchema[T] = schemaOf[T](scalaTypeOf(mf))
+object BeanSchema {
+  def schemaOf[T <: AnyRef](implicit mf: Manifest[T]): BeanSchema[T] = schemaOf[T](scalaTypeOf(mf))
 
   def schemaOf[T <: AnyRef](beanType: ScalaType) = {
     val beanDescriptor = descriptorOf(beanType)
@@ -161,6 +164,6 @@ object MirrorSchema {
       }
       yield field
     }
-    new MirrorSchema[T](beanDescriptor, fields)
+    new BeanSchema[T](beanDescriptor, fields)
   }
 }

@@ -49,7 +49,7 @@ abstract class Field[B <: AnyRef](val tag: Int, propertyDescriptor: PropertyDesc
   protected def getValue(message: B): valueHandler.V
 }
 
-object MirrorField {
+object Field {
   def apply[B <: AnyRef](tag: Int, prop: PropertyDescriptor) =
       for (vh <- ValueHandler(prop.scalaType))
       yield new Field[B](tag, prop) {

@@ -26,7 +26,7 @@ class CollectionsTest extends TestCase {
   import TestFormat._
 
   val linkedBuffer = LinkedBuffer.allocate(512)
-  val schema = MirrorSchema.schemaOf[Person]
+  val schema = BeanSchema.schemaOf[Person]
                                    
   @Test
   def testGraph() {
