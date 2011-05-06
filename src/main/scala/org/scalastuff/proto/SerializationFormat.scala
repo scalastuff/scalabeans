@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2011 ScalaStuff.org (joint venture of Alexander Dvorkovyy and Ruud Diterwich)
  * Copyright 2007-2011 David Yu dyuproject@gmail.com (derived from work)
  *
@@ -14,6 +14,7 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+
 package org.scalastuff.proto
 
 import com.dyuproject.protostuff._

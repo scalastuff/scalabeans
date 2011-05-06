@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2011 ScalaStuff.org (joint venture of Alexander Dvorkovyy and Ruud Diterwich)
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +24,8 @@ import org.scalastuff.scalabeans.Preamble._
 
 /**
  * Schema implementation for bean serialization. 
+ * 
+ * No deserialization implemented, use either BeanSchema or BeanBuiderSchema.
  */
 class WriteBeanSchema[T <: AnyRef](val beanDescriptor: BeanDescriptor, val fields: Seq[Field[T]]) extends Schema[T] {
 
@@ -94,6 +96,9 @@ class WriteBeanSchema[T <: AnyRef](val beanDescriptor: BeanDescriptor, val field
 
 }
 
+/**
+ * @see [Preamble#beanSchemaOf Preamble.beanSchemaOf]
+ */
 class BeanSchema[T <: AnyRef](_beanDescriptor: BeanDescriptor, override val fields: Seq[MutableField[T]])
   extends WriteBeanSchema[T](_beanDescriptor, fields) {
 

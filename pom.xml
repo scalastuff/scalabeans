@@ -51,6 +51,28 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>com.mycila.maven-license-plugin</groupId>
+				<artifactId>maven-license-plugin</artifactId>
+				<version>1.9.0</version>
+				<configuration>
+					<header>src/etc/header.txt</header>
+					<validHeaders>
+	          <validHeader>src/etc/header-protostuff.txt</validHeader>
+          </validHeaders>
+					<strictCheck>true</strictCheck>
+					<includes>
+						<include>src/main/scala/**</include>						
+					</includes>					
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 	<dependencies>		

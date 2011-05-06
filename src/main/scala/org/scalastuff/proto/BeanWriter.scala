@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2011 ScalaStuff.org (joint venture of Alexander Dvorkovyy and Ruud Diterwich)
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,7 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+
 package org.scalastuff.proto
 
 import org.scalastuff.proto.value.BeanValueHandler
