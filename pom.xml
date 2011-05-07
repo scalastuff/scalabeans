@@ -5,7 +5,7 @@
 	<groupId>org.scalastuff</groupId>
 	<artifactId>scalabeans</artifactId>
 	<packaging>jar</packaging>
-	<version>0.1</version>
+	<version>0.2-SNAPSHOT</version>
 	<name>ScalaBeans</name>
 	<description>Reflection toolkit for Scala</description>
 	<url>http://scalastuff.org</url>
