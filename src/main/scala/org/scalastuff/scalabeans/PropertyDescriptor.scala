@@ -98,7 +98,7 @@ object PropertyDescriptor {
       }
     }
 
-    def immutableFieldPropertyDescriptor(field: Field, typeHint: Option[ScalaType], ctorParameterIndex: Int, defaultValueMethod: Option[Method]) = {
+    def immutableFieldPropertyDescriptor(field: Field, typeHint: Option[ScalaType], ctorParameterIndex: Int) = {
       if (ctorParameterIndex < 0) {
         new ImmutableFieldPropertyDescriptor(field, typeHint)
       } else {
@@ -106,15 +106,15 @@ object PropertyDescriptor {
       }
     }
 
-    def mutableFieldPropertyDescriptor(field: Field, ctorParameterIndex: Int, defaultValueMethod: Option[Method]) = {
+    def mutableFieldPropertyDescriptor(field: Field, typeHint: Option[ScalaType], ctorParameterIndex: Int) = {
       if (ctorParameterIndex < 0) {
-        new MutableFieldPropertyDescriptor(field) { def index = _index }
+        new MutableFieldPropertyDescriptor(field, typeHint) { def index = _index }
       } else {
-        new MutableFieldPropertyDescriptor(field) with ConstructorParameterImpl
+        new MutableFieldPropertyDescriptor(field, typeHint) with ConstructorParameterImpl
       }
     }
 
-    def getterPropertyDescriptor(getter: Method, typeHint: Option[ScalaType], ctorParameterIndex: Int, defaultValueMethod: Option[Method]) = {
+    def getterPropertyDescriptor(getter: Method, typeHint: Option[ScalaType], ctorParameterIndex: Int) = {
       if (ctorParameterIndex < 0) {
         new GetterPropertyDescriptor(getter, typeHint)
       } else {
@@ -122,11 +122,11 @@ object PropertyDescriptor {
       }
     }
 
-    def getterSetterPropertyDescriptor(getter: Method, setter: Method, ctorParameterIndex: Int, defaultValueMethod: Option[Method]) = {
+    def getterSetterPropertyDescriptor(getter: Method, setter: Method, typeHint: Option[ScalaType], ctorParameterIndex: Int) = {
       if (ctorParameterIndex < 0) {
-        new GetterSetterPropertyDescriptor(getter, setter) { def index = _index }
+        new GetterSetterPropertyDescriptor(getter, setter, typeHint) { def index = _index }
       } else {
-        new GetterSetterPropertyDescriptor(getter, setter) with ConstructorParameterImpl
+        new GetterSetterPropertyDescriptor(getter, setter, typeHint) with ConstructorParameterImpl
       }
     }
 
@@ -147,8 +147,8 @@ object PropertyDescriptor {
     class ImmutableFieldPropertyDescriptor(field: Field, typeHint: Option[ScalaType])
       extends FieldPropertyDescriptor(field, typeHint) with ImmutablePropertyDescriptor
 
-    abstract class MutableFieldPropertyDescriptor(field: Field)
-      extends FieldPropertyDescriptor(field, None) with MutablePropertyDescriptor {
+    abstract class MutableFieldPropertyDescriptor(field: Field, typeHint: Option[ScalaType])
+      extends FieldPropertyDescriptor(field, typeHint) with MutablePropertyDescriptor {
 
       def set(obj: AnyRef, value: Any) = field.set(obj, value)
     }
@@ -170,7 +170,7 @@ object PropertyDescriptor {
 
     class GetterPropertyDescriptor(getter: Method, typeHint: Option[ScalaType]) extends MethodPropertyDescriptor(getter, typeHint) with ImmutablePropertyDescriptor
 
-    abstract class GetterSetterPropertyDescriptor(getter: Method, setter: Method) extends MethodPropertyDescriptor(getter, None) with MutablePropertyDescriptor {
+    abstract class GetterSetterPropertyDescriptor(getter: Method, setter: Method, typeHint: Option[ScalaType]) extends MethodPropertyDescriptor(getter, typeHint) with MutablePropertyDescriptor {
       setter.setAccessible(true)
 
       def set(obj: AnyRef, value: Any): Unit = setter.invoke(obj, value.asInstanceOf[AnyRef])
@@ -178,19 +178,24 @@ object PropertyDescriptor {
 
     val propertyTypeHint = _beanType match {
       case tt: TupleType => Some(tt.arguments(_tag - 1))
-      case _ => None
+      case _ => 
+        for {
+          member <- field orElse getter
+          classInfo <- SymtableParser.classInfoOf(_beanType)
+          typeHint <- classInfo.findPropertyType(member.getName)
+        } yield typeHint
     }
 
     ((field, getter, setter): @unchecked) match {
       case (Some(f), None, None) =>
-        if (Modifier.isFinal(f.getModifiers)) immutableFieldPropertyDescriptor(f, propertyTypeHint, ctorParameterIndex, defaultValueMethod)
-        else mutableFieldPropertyDescriptor(f, ctorParameterIndex, defaultValueMethod)
+        if (Modifier.isFinal(f.getModifiers)) immutableFieldPropertyDescriptor(f, propertyTypeHint, ctorParameterIndex)
+        else mutableFieldPropertyDescriptor(f, propertyTypeHint, ctorParameterIndex)
 
       case (Some(f), Some(g), None) =>
-        getterPropertyDescriptor(g, propertyTypeHint, ctorParameterIndex, defaultValueMethod)
+        getterPropertyDescriptor(g, propertyTypeHint, ctorParameterIndex)
 
       case (_, Some(g), Some(s)) =>
-        getterSetterPropertyDescriptor(g, s, ctorParameterIndex, defaultValueMethod)
+        getterSetterPropertyDescriptor(g, s, propertyTypeHint, ctorParameterIndex)
     }
   }
 }

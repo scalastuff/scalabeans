@@ -94,11 +94,7 @@ object BeanIntrospector {
     }
 
     def typeSupported(scalaType: ScalaType) = {
-//      val typeName = scalaType.erasure.getName
-//      !(typeName startsWith "java.") &&
-//      !(typeName startsWith "scala.")
-
-      true // todo: list supported Java and Scala types ...
+      true // TODO: list of supported Java and Scala types ...
     }
 
     val fieldProperties = for {
@@ -108,7 +104,7 @@ object BeanIntrospector {
 
       if !name.contains('$')
       if !field.isSynthetic
-      if typeSupported(scalaTypeOf(field.getGenericType))
+//      if typeSupported(scalaTypeOf(field.getGenericType))
 
       getter = findMethod(_beanType.erasure, name)
       setter = findMethod(_beanType.erasure, name + "_$eq")
@@ -122,7 +118,7 @@ object BeanIntrospector {
       if getter.getParameterTypes.length == 0
       if getter.getReturnType != Void.TYPE
       if !name.contains('$')
-      if typeSupported(scalaTypeOf(getter.getGenericReturnType))
+//      if typeSupported(scalaTypeOf(getter.getGenericReturnType))
       if !fieldProperties.exists(_.name == name)
       setter <- c.getDeclaredMethods.find(_.getName == name + "_$eq")
 
@@ -155,10 +151,7 @@ object BeanIntrospector {
   	println(prefix + "  Enum Values: ")
   	for (f <- c.getMethods filter (m => m.getParameterTypes.isEmpty && classOf[Enumeration$Value].isAssignableFrom(m.getReturnType))) {
   		val instance = new Enumeration{}
-//  		val value = f.invoke(instance).asInstanceOf[Enumeration$Value]
   		println(prefix + "    a" )
   	}
-//  	println(prefix + "  Companion:")
-//  	print(Class.forName(c.getName + "$"), "      ")
   }
 }

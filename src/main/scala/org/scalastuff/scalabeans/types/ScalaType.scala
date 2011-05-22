@@ -434,15 +434,14 @@ object ScalaType {
     def arg(index: Int): ScalaType = if (index < mf.typeArguments.size) scalaTypeOf(mf.typeArguments(index)) else TheAnyRefType
     def argTuple2 = new Impl(classOf[Tuple2[_, _]], arg(0), arg(1)) with TupleType
     
-    def createArrayType(mf: Manifest[_]) = {
-	  
+    def createArrayType(mf: Manifest[_]) = {	  
 	  val contentTypeManifest =
-      if (mf.typeArguments.size > 0) mf.typeArguments(0)
-      else ManifestFactory.manifestOf(mf.erasure.getComponentType)
+        if (mf.typeArguments.size > 0) mf.typeArguments(0)
+        else ManifestFactory.manifestOf(mf.erasure.getComponentType)
 
 	  new Impl(mf.erasure, scalaTypeOf(contentTypeManifest)) with ArrayType {
-      def newArrayBuilder[A](): ArrayBuilder[A] = contentTypeManifest.newArrayBuilder().asInstanceOf[ArrayBuilder[A]]
-    }
+        def newArrayBuilder[A](): ArrayBuilder[A] = contentTypeManifest.newArrayBuilder().asInstanceOf[ArrayBuilder[A]]
+      }
 	}
     
     if (classOf[Int] == mf.erasure || classOf[java.lang.Integer] == mf.erasure) IntType

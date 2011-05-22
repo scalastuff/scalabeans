@@ -17,7 +17,7 @@
 package org.scalastuff.scalabeans
 
 import reflect.Manifest
-import java.lang.reflect.{TypeVariable, WildcardType, ParameterizedType, Type, GenericArrayType}
+import java.lang.reflect.{ TypeVariable, WildcardType, ParameterizedType, Type, GenericArrayType }
 import org.scalastuff.scalabeans.types.ScalaType
 
 object ManifestFactory {
@@ -29,19 +29,15 @@ object ManifestFactory {
       val typeArgs = pt.getActualTypeArguments map manifestOf
 
       if (pt.getOwnerType == null) {
-        if (typeArgs.size == 0) {
-          fromClass(clazz)
-        } else {
-          Manifest.classType(clazz, typeArgs.head, typeArgs.tail: _*)
-        }
+        manifestOf(clazz, typeArgs)
       } else {
         Manifest.classType(manifestOf(pt.getOwnerType), clazz, typeArgs: _*)
       }
-      
+
     case at: GenericArrayType =>
-    	val componentManifest = manifestOf(at.getGenericComponentType)
-    	val arrayManifest = componentManifest.arrayManifest // strips component type args off
-    	Manifest.classType(arrayManifest.erasure, componentManifest)
+      val componentManifest = manifestOf(at.getGenericComponentType)
+      val arrayManifest = componentManifest.arrayManifest // strips component type args off
+      Manifest.classType(arrayManifest.erasure, componentManifest)
 
     case wt: WildcardType =>
       val upper = wt.getUpperBounds
@@ -54,13 +50,23 @@ object ManifestFactory {
       else manifestOf(classOf[AnyRef])
   }
 
+  def manifestOf(erasure: Class[_], typeArgs: Seq[Manifest[_]]): Manifest[_] = {
+    if (typeArgs.size == 0) {
+      fromClass(erasure)
+    } else {
+      val normalizedErasure =
+        if (erasure.getName == "scala.Array")
+          typeArgs(0).arrayManifest.erasure
+        else
+          erasure
+
+      Manifest.classType(normalizedErasure, typeArgs.head, typeArgs.tail: _*)
+    }
+  }
+
   def manifestOf(st: ScalaType): Manifest[_] = {
     val typeArgs = st.arguments map manifestOf
-    if (typeArgs.size == 0) {
-      fromClass(st.erasure)
-    } else {
-      Manifest.classType(st.erasure, typeArgs.head, typeArgs.tail: _*)
-    }
+    manifestOf(st.erasure, typeArgs)
   }
 
   private def fromClass(clazz: Predef.Class[_]): Manifest[_] = clazz match {
