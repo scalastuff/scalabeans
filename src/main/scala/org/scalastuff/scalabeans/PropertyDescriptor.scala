@@ -19,6 +19,7 @@ package org.scalastuff.scalabeans
 import java.lang.reflect.{ AnnotatedElement, Modifier, Method, Field }
 import Preamble._
 import org.scalastuff.scalabeans.types._
+import org.scalastuff.scalabeans.sig.ScalaTypeCompiler
 
 abstract class PropertyDescriptor {
 
@@ -181,7 +182,7 @@ object PropertyDescriptor {
       case _ => 
         for {
           member <- field orElse getter
-          classInfo <- SymtableParser.classInfoOf(_beanType)
+          classInfo <- ScalaTypeCompiler.classInfoOf(_beanType)
           typeHint <- classInfo.findPropertyType(member.getName)
         } yield typeHint
     }
