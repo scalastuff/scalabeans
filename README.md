@@ -46,9 +46,9 @@ If you use Maven, add following lines to your pom.xml:
 0.2-SNAPSHOT status
 -------------------
 
-All tests pass now with Scala 2.9.0. Unfortunatelly, code doesn't compile with 2.8.1
+All tests pass now with Scala 2.9.0 and 2.8.1
 
-It can be obtained from OOS Sonatype snapshots repository: 
+It can be obtained from OOS Sonatype snapshots repository, use classifier 2.8.1 for Scala 2.8.1: 
 
     <dependencies>
     ...
