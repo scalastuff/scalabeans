@@ -289,7 +289,7 @@ trait Mirror { mirror =>
   }
 
   /**  */
-  trait PackageDecl extends ModuleDecl with MemberDecl {
+  trait PackageDecl extends TermDecl {
     def owner: PackageDecl
     override def toString =
       "package " + name

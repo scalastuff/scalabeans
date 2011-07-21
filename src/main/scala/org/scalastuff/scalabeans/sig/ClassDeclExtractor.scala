@@ -17,39 +17,72 @@ package org.scalastuff.scalabeans.sig
 
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
-import UnPickler._
-import Mirror._
+
 import scala.reflect.generic.Flags._
 import com.google.common.collect.MapMaker
 
 /**
  * Extracts class and object declaration information from Scala signature.
  *
+ * Only top-level classes and objects are parsed now. Declarations contain declared parents,
+ * property candidates (no strict filtering, actual properties are still resolved via Java reflection),
+ * type aliases. All returned objects are thread-safe.
+ *
+ * No types in other top-level entities are referenced directly, but via ExternalTermRef,
+ * ExternalModuleRef and ExternalTypeRef. Those must be resolved by extracting declarations
+ * from corresponding top-level entities.
+ *
  * Uses output from UnPickler to get raw data structures in PickleFormat.
  */
 object ClassDeclExtractor {
-  def extract[T](implicit mf: Manifest[T]): Option[Seq[EntityDecl]] = extract(mf.erasure)
-  def extract(clazz: String): Option[Seq[EntityDecl]] = extract(Class.forName(clazz))
+  def extract[T](implicit mf: Manifest[T]): Option[Seq[Mirror.EntityDecl]] = extract(mf.erasure)
+  def extract(clazz: String): Option[Seq[Mirror.EntityDecl]] = extract(Class.forName(clazz))
 
-  private[this] val declarationsCache = new MapMaker().weakKeys().makeMap[Class[_], Option[Seq[EntityDecl]]]()
+  /**
+   * Declarations are grouped by the class where they appear in the Scala signature.
+   */
+  private[this] val declarationsCache = new MapMaker().weakKeys().makeMap[Class[_], Option[Seq[Mirror.EntityDecl]]]()
 
-  def extract(clazz: Class[_]): Option[Seq[EntityDecl]] = {
+  def extract(clazz: Class[_]): Option[Seq[Mirror.EntityDecl]] = {
     val cached = declarationsCache.get(clazz)
     if (cached != null) return cached
 
     val extracted =
-      for (table <- read(clazz)) yield new ClassDeclExtractor().extract(table)
+      for (table <- UnPickler.read(clazz)) yield new ClassDeclExtractor().extract(table)
 
     declarationsCache.putIfAbsent(clazz, extracted)
     extracted
   }
+
+  val mirror: scala.metaprogramming.Mirror = new scala.metaprogramming.Mirror {
+    val rootPackageDecl = new PackageDecl {
+      val name = "<root>"
+      val owner = this
+    }
+  }
+  
+  type Type = mirror.Type
+  type EntityDecl = mirror.EntityDecl
+  case class ClassDecl
+  case class ValueDecl(name:String, owner: EntityDecl, visibility: Visibility, valueType: Type) extends mirror.ValueDecl with mirror.MemberDecl
+  
+  type Visibility = mirror.Visibility
+  object Public extends mirror.Public
+  
 }
 
+/**
+ * This class is not thread-safe and must be not used directly. Use companion object API instead.
+ */
 class ClassDeclExtractor {
+  import UnPickler._
+  import Mirror._
+
   def extract(table: Array[Entry]): Seq[EntityDecl] = {
     val children = HashMap[SymbolDeclEntry, ArrayBuffer[SymbolDeclEntry]]()
     val topLevelEntries = ArrayBuffer[SymbolDeclEntry]()
 
+    // collect symbol children
     for (i <- 0 until table.length) table(i) match {
       case symbolEntry: SymbolDeclEntry =>
         symbolEntry.owner match {
@@ -62,6 +95,7 @@ class ClassDeclExtractor {
       case _ =>
     }
 
+    // parse top-level entities
     for (symDeclEntry <- topLevelEntries)
       yield symDeclEntry match {
       case cs: ClassSym => parseClassSymbol(cs, children.getOrElse(cs, Seq.empty[SymbolDeclEntry]))
@@ -69,10 +103,10 @@ class ClassDeclExtractor {
     }
   }
 
-  private[this] def extractValues(_owner: EntityDecl, children: Seq[SymbolDeclEntry]):  Seq[ValueDecl with MemberDecl] = children collect {
-    case vs: ValSym if !(vs.name.endsWith(" ")) && !(vs.name.contains("$"))
+  private[this] def extractValues(_owner: EntityDecl, children: Seq[SymbolDeclEntry]): Seq[ValueDecl with MemberDecl] = children collect {
+    case vs: ValSym if !(vs.name.endsWith(" "))
       && (vs.typeEntry.isValueType)
-      && (vs.flags & FINAL) == 0 =>
+      && (vs.flags & (FINAL | SYNTHETIC)) == 0 =>
       new ValueDecl with MemberDecl {
         val name = vs.name
         val owner = _owner
@@ -80,6 +114,24 @@ class ClassDeclExtractor {
         val valueType = parseType(vs.typeEntry)
       }
   }
+
+//  private[this] def extractMembers(_owner: EntityDecl, children: Seq[SymbolDeclEntry]): Seq[ValueDecl with MemberDecl] = {
+//    val vals = new ArrayBuffer[ValueDecl with MemberDecl]()
+//    val methods = new ArrayBuffer[ValueDecl with MemberDecl]()
+//    for (member <- children) member match {
+//      case vs: ValSym if !(vs.name.endsWith(" "))
+//        && (vs.typeEntry.isValueType)
+//        && (vs.flags & (FINAL | SYNTHETIC)) == 0 =>
+//        new ValueDecl with MemberDecl {
+//          val name = vs.name
+//          val owner = _owner
+//          val visibility = Public // TODO
+//          val valueType = parseType(vs.typeEntry)
+//        }
+//    }
+//
+//    vals
+//  }
 
   def parseClassSymbol(classSym: ClassSym, children: Seq[SymbolDeclEntry]) = {
     new ClassDecl { self =>

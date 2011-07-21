@@ -17,11 +17,11 @@ class ClassDeclExtractorTest {
     assertEquals(7, classDecl.values.size)
     checkProp(classDecl.values(0), "ai", "scala.Array[scala.Int]")
     checkProp(classDecl.values(1), "aoi", "scala.Array[scala.Option[scala.Int]]")
-    checkProp(classDecl.values(2), "aoli", "scala.Array[scala.Option[scala.package#scala.package.List[scala.Int]]]")
+    checkProp(classDecl.values(2), "aoli", "scala.Array[scala.Option[scala.package.type#List[scala.Int]]]")
     checkProp(classDecl.values(3), "opt", "scala.Option[scala.Int]")
-    checkProp(classDecl.values(4), "listopt", "scala.package#scala.package.List[scala.Option[scala.Int]]")
-    checkProp(classDecl.values(5), "map", "scala.Predef#scala.Predef.Map[scala.Option[scala.Predef#scala.Predef.String], scala.package#scala.package.List[scala.Option[scala.Float]]]")
-    checkProp(classDecl.values(6), "priv", "scala.package#scala.package.Seq[scala.Boolean]")
+    checkProp(classDecl.values(4), "listopt", "scala.package.type#List[scala.Option[scala.Int]]")
+    checkProp(classDecl.values(5), "map", "scala.Predef.type#Map[scala.Option[scala.Predef.type#String], scala.package.type#List[scala.Option[scala.Float]]]")
+    checkProp(classDecl.values(6), "priv", "scala.package.type#Seq[scala.Boolean]")
   }
 
   def checkProp(valDecl: ValueDecl, name: String, typeStr: String) {
@@ -52,5 +52,5 @@ package testbeans {
     def funct(x: Int, y: Option[Int]): Int = x
 
     private[this] val priv: Seq[Boolean] = Seq.empty
-  }
+  }  
 }

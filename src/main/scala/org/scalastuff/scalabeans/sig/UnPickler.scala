@@ -63,6 +63,7 @@ object UnPickler extends Application {
     lazy val typeEntry: TypeEntry = table(symbolInfo.infoRef) match {
       case te: TypeEntry => te
       case x @ _ =>
+        // TODO: is this hack correct?
         val typeRef = symbolInfo.privateWithinRef getOrElse (throw new RuntimeException("unexpected entry " + x))        
         table(typeRef).asInstanceOf[TypeEntry]
     }
@@ -95,7 +96,7 @@ object UnPickler extends Application {
   }
   trait CompoundTypeEntryRef extends TypeEntryRef {
     def typeRef: Int
-    lazy val typeEntry = table(typeRef).asInstanceOf[TypeEntry]
+    lazy val typeEntry = table(typeRef).asInstanceOf[TypeEntry] // TODO: sometimes other Entry type
   }
 
   type SymbolInfo = PickleBuffer#SymbolInfo

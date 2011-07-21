@@ -13,32 +13,24 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+/**
+ * Original work published by Gilles Dubochet on 2010-06-30 under BSD license.
+ * 
+ * https://github.com/dubochet/scala-reflection/commit/53b4c0ff812468620ac816f1b24c27baf522f4d0
+ * https://github.com/dubochet/scala-reflection/blob/master/frontend/src/scala/metaprogramming/Mirror.scala
+ */
 package org.scalastuff.scalabeans.sig
 
 import collection._
-
-object Mirror extends Mirror
 
 /** A mirror is the entry point of Scala's meta-programming infrastructure: it reflects program entities such as
   * instances, classes, etc. Every program entity is reflected as a unique `Reflection` instance in this mirror.
   *
   * A mirror only reflects program entities that are within its field of view, which interpretation is left to
   * subclasses (usually a given virtual machine and class loader, or a compiler instance).
-  *
-  * Note that the `Reflection` class and its subclasses are path-dependent to the mirror that owns them. */
-trait Mirror { mirror =>
-    
-  case class ExternalTermRef(name: String, owner: Declaration) extends TermDecl
-  case class ExternalModuleRef(name: String, owner: Declaration) extends TermDecl
-  case class ExternalTypeRef(name: String, owner: Declaration) extends TypeDecl {
-    val typeParameters: TypeParameters = Nil // real type parameters have to be resolved from actual declaration
-    override def toString = owner.qualifiedName + "." + name
-  }
-//  case class ExternalAliasTypeRef(name: String, owner: Declaration) extends TypeDecl {
-//    val typeParameters: TypeParameters = Nil // real type parameters have to be resolved from actual declaration
-//    override def toString = owner.qualifiedName + "#" + name
-//  }
-
+  */
+object Mirror extends Mirror
+trait Mirror {
   type Name = String  
 
   /** A reflection represents a program entity such as an instance, class, etc. reflected in the mirror owning it. */
@@ -69,10 +61,9 @@ trait Mirror { mirror =>
     override def toString = parent match {
       case st: SingletonType =>
         st.path match {
-          case mp: MemberPath =>
-            if (mp.value.isInstanceOf[ExternalModuleRef]) mp.toString + "#" + member.toString
-            else member.toString
-          case _ => parent.toString + "#" + member.toString
+          case EmptyPath => member.toString          
+          case mp: MemberPath if !mp.value.isInstanceOf[ExternalModuleRef] => member.toString
+          case _ => parent.toString + "#" + member.name // type alias actually
         }
       case _ => parent.toString + "#" + member.toString        
     }
@@ -303,6 +294,15 @@ trait Mirror { mirror =>
   val rootPackageDecl = new PackageDecl {
     val name = "<root>"
     val owner = this
+  }
+  
+  /* ========== References ========== */
+  
+  case class ExternalTermRef(name: String, owner: Declaration) extends TermDecl
+  case class ExternalModuleRef(name: String, owner: Declaration) extends TermDecl
+  case class ExternalTypeRef(name: String, owner: Declaration) extends TypeDecl {
+    val typeParameters: TypeParameters = Nil // real type parameters have to be resolved from actual declaration
+    override def toString = owner.qualifiedName + "." + name
   }
 
   /* ========== SCOPES ========== */

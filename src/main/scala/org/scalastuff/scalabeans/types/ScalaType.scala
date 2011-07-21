@@ -75,6 +75,7 @@ object AnyRefType {
 trait OptionType extends AnyRefType with SingleArgument
 
 object OptionType {
+  def apply(arg: ScalaType): OptionType = new Impl(classOf[Option[_]], arg) with OptionType
   def unapply(t: OptionType) = Some(t.argument)
 }
 
@@ -180,8 +181,6 @@ trait CollectionType extends AnyRefType with SingleArgument {
         None
     }
   }
-
-  //def newBuilder = companion map (_.newBuilder)
 }
 
 object CollectionType {
@@ -215,6 +214,7 @@ object IterableType {
 trait SeqType extends IterableType
 
 object SeqType {
+  def apply(arg: ScalaType): SeqType = new Impl(classOf[scala.collection.Seq[_]], arg) with SeqType
   def unapply(t: SeqType) = Some(t.argument)
 }
 
@@ -281,6 +281,7 @@ object MutableLinearSeqType {
 trait ListType extends ImmutableLinearSeqType
 
 object ListType {
+  def apply(arg: ScalaType): ListType = new Impl(classOf[scala.collection.immutable.List[_]], arg) with ListType
   def unapply(t: ListType) = Some(t.argument)
 }
 
@@ -369,8 +370,9 @@ object LinkedHashSetType {
 }
 
 trait MapType extends IterableType {
+  override def toString() = erasure.getSimpleName + "[" + keyType.toString + "," + valueType + "]"
+  
   def keyType = argument.arguments(0)
-
   def valueType = argument.arguments(1)
 }
 
