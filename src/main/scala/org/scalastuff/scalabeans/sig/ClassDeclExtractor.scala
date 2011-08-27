@@ -61,14 +61,14 @@ object ClassDeclExtractor {
     }
   }
   
-  type Type = mirror.Type
-  type EntityDecl = mirror.EntityDecl
-  case class ClassDecl
-  case class ValueDecl(name:String, owner: EntityDecl, visibility: Visibility, valueType: Type) extends mirror.ValueDecl with mirror.MemberDecl
-  
-  type Visibility = mirror.Visibility
-  object Public extends mirror.Public
-  
+//  type Type = mirror.Type
+//  type EntityDecl = mirror.EntityDecl
+//  case class ClassDecl
+//  case class ValueDecl(name:String, owner: EntityDecl, visibility: Visibility, valueType: Type) extends mirror.ValueDecl with mirror.MemberDecl
+//  
+//  type Visibility = mirror.Visibility
+//  object Public extends mirror.Public
+//  
 }
 
 /**
