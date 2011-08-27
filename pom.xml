@@ -3,7 +3,7 @@
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.scalastuff</groupId>
-	<artifactId>scalabeans_2.9.0</artifactId>
+	<artifactId>scalabeans</artifactId>
 	<packaging>jar</packaging>
 	<version>0.2-SNAPSHOT</version>
 	<name>ScalaBeans</name>
