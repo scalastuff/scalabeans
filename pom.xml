@@ -3,7 +3,7 @@
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.scalastuff</groupId>
-	<artifactId>scalabeans_2.8.1</artifactId>
+	<artifactId>scalabeans_2.9.0</artifactId>
 	<packaging>jar</packaging>
 	<version>0.2-SNAPSHOT</version>
 	<name>ScalaBeans</name>
@@ -32,7 +32,7 @@
 	</developers>
 	<properties>
 		<project.build.sourcEncoding>UTF-8</project.build.sourcEncoding>
-		<scala.version>2.8.1</scala.version>
+		<scala.version>2.9.0-1</scala.version>
 		<protostuff.version>1.0.1</protostuff.version>
 	</properties>
 	<build>
