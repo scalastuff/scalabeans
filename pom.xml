@@ -30,10 +30,15 @@
 			<name>Alexander Dvorkovyy</name>
 		</developer>
 	</developers>
+	<contributors>
+		<contributor>
+			<name>Sergey Nazarov</name>
+		</contributor>
+	</contributors>
 	<properties>
 		<project.build.sourcEncoding>UTF-8</project.build.sourcEncoding>
 		<scala.version>2.9.0-1</scala.version>
-		<protostuff.version>1.0.1</protostuff.version>
+		<protostuff.version>1.0.3</protostuff.version>
 	</properties>
 	<build>
 		<sourceDirectory>src/main/scala</sourceDirectory>

@@ -170,7 +170,7 @@ class JavaEnumTestBean extends TestBean[JavaEnumTestBean] {
     this
   }
 
-  def assertEquals(other: EnumTestBean) {
+  def assertEquals(other: JavaEnumTestBean) {
     Assert.assertEquals(e, other.e)
   }
 }
