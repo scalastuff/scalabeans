@@ -139,17 +139,26 @@ object TupleType {
 // ******* Enums ******
 
 trait EnumType extends AnyRefType {
-	def enum : Enum[AnyRef]
+  def enum : Enum[AnyRef]
 	
   override def equals(other: Any) = other match {
     case that: EnumType => super.equals(other) && enum == that.enum
     case _ => false
   }
-	override def hashCode = 41 * (41 + super.hashCode) + enum.hashCode
+  
+  override def hashCode = 41 * (41 + super.hashCode) + enum.hashCode
 }
 
 object EnumType {
-	def unapply(t: EnumType) = Some(t.enum)
+  def unapply(t: EnumType) = Some(t.enum)
+}
+
+trait JavaEnumType extends AnyRefType with SingleArgument {
+  override def toString = "JavaEnum[" + argument.toString + "]"
+}
+
+object JavaEnumType {
+  def unapply(t: JavaEnumType) = Some(t.argument)
 }
 
 // ******* Arrays ******
@@ -463,6 +472,7 @@ object ScalaType {
     else if (classOf[scala.Option[_]] == mf.erasure) new Impl(mf.erasure, arg(0)) with OptionType
     else if (classOf[scala.Tuple1[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with TupleType
     else if (classOf[scala.Tuple2[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0), arg(1)) with TupleType
+    else if (classOf[java.lang.Enum[_]].isAssignableFrom(mf.erasure)) new Impl(classOf[java.lang.Enum[_]], new Impl(mf.erasure) with AnyRefType) with JavaEnumType
     else if (mf.erasure.isArray) createArrayType(mf)
     else if (classOf[scala.collection.mutable.LinkedHashMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with LinkedHashMapType
     else if (classOf[scala.collection.immutable.HashMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with ImmutableHashMapType

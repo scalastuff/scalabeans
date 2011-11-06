@@ -22,7 +22,7 @@ Getting started
 If you use SBT, add following lines to your project:	
 
     val scalaStuffRepo = "Sonatype OSS releases" at "http://oss.sonatype.org/content/repositories/releases"
-    val scalabeans = "org.scalastuff" % "scalabeans" % "0.1"
+    val scalabeans = "org.scalastuff" % "scalabeans" % "0.2"
 
 
 If you use Maven, add following lines to your pom.xml:
@@ -32,7 +32,7 @@ If you use Maven, add following lines to your pom.xml:
       <dependency>
         <groupId>org.scalastuff</groupId>
         <artifactId>scalabeans</artifactId>
-        <version>0.1</version>
+        <version>0.2</version>
       </dependency>
     </dependencies>
     <repositories>
@@ -43,25 +43,4 @@ If you use Maven, add following lines to your pom.xml:
       </repository>
     </repositories>
     
-0.2-SNAPSHOT status
--------------------
-
-All tests pass now with Scala 2.9.0 and 2.8.1
-
-It can be obtained from OOS Sonatype snapshots repository, use classifier 2.8.1 for Scala 2.8.1: 
-
-    <dependencies>
-    ...
-      <dependency>
-        <groupId>org.scalastuff</groupId>
-        <artifactId>scalabeans</artifactId>
-        <version>0.2-SNAPSHOT</version>
-      </dependency>
-    </dependencies>
-    <repositories>
-    ...
-      <repository>
-        <id>Sonatype OSS snapshots</id>
-        <url>http://oss.sonatype.org/content/repositories/snapshots</url>    
-      </repository>
-    </repositories>
+For Scala 2.8.x use scalabeans_2.8.1 artifactId

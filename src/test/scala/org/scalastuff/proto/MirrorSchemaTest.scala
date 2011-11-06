@@ -49,6 +49,11 @@ class MirrorSchemaTest {
   def testEnum {
     checkFormats(() => new EnumTestBean())
   }
+  
+  @Test
+  def testJavaEnum {
+    checkFormats(() => new JavaEnumTestBean())
+  }
 
   @Test
   def testOptional {
@@ -147,6 +152,21 @@ class EnumTestBean extends TestBean[EnumTestBean] {
 
   def set1() = {
     e = Gender.M
+    this
+  }
+
+  def assertEquals(other: EnumTestBean) {
+    Assert.assertEquals(e, other.e)
+  }
+}
+
+class JavaEnumTestBean extends TestBean[JavaEnumTestBean] {
+  import java.lang.annotation.RetentionPolicy
+  
+  var e: RetentionPolicy = RetentionPolicy.CLASS
+
+  def set1() = {
+    e = RetentionPolicy.RUNTIME
     this
   }
 
