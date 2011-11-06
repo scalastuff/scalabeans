@@ -168,7 +168,7 @@ trait ArrayType extends AnyRefType with SingleArgument {
 }
 
 object ArrayType {
-	def unapply(t: ArrayType) = Some(t.argument)
+  def unapply(t: ArrayType) = Some(t.argument)
 }
 
 // ******* Collections ******
