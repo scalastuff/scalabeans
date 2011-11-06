@@ -1,6 +1,8 @@
 /target
 /.scala_dependencies
 /.classpath
+/.settings
+/.project
 /lib_managed
 /bin
 /mavenrepo
