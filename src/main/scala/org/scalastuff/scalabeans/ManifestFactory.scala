@@ -18,7 +18,7 @@ package org.scalastuff.scalabeans
 
 import reflect.Manifest
 import java.lang.reflect.{ TypeVariable, WildcardType, ParameterizedType, Type, GenericArrayType }
-import org.scalastuff.scalabeans.types.ScalaType
+import org.scalastuff.scalabeans.types.{ScalaType, MapType}
 
 object ManifestFactory {
   def manifestOf(t: Type): Manifest[_] = t match {
@@ -64,9 +64,12 @@ object ManifestFactory {
     }
   }
 
-  def manifestOf(st: ScalaType): Manifest[_] = {
-    val typeArgs = st.arguments map manifestOf
-    manifestOf(st.erasure, typeArgs)
+  def manifestOf(st: ScalaType): Manifest[_] = st match {
+    case MapType(keyType, valueType) =>
+      manifestOf(st.erasure, Seq(manifestOf(keyType), manifestOf(valueType)))
+    case _ =>
+      val typeArgs = st.arguments map manifestOf
+      manifestOf(st.erasure, typeArgs)
   }
 
   private def fromClass(clazz: Predef.Class[_]): Manifest[_] = clazz match {

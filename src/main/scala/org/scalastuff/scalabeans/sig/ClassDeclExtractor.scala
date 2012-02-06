@@ -186,14 +186,16 @@ class ClassDeclExtractor {
       }
     }
   }
+  
+  import org.scalastuff.util.HashMapMemo._
 
-  val parseClassParents: PartialFunction[TypeEntry, List[Type]] = Memoizable({
+  val parseClassParents: PartialFunction[TypeEntry, List[Type]] = memoize({
     case ct: ClassInfoType => ct.parentEntries map parseType toList
     case trt: TypeRefType => parseClassParents(trt.symbolEntry.asInstanceOf[SymbolDeclEntry].typeEntry) // TODO: apply type parameters
     case pt: PolyType => parseClassParents(pt.typeEntry)
   })
 
-  val parseTermSymbol: PartialFunction[SymbolEntry, TermDecl] = Memoizable({
+  val parseTermSymbol: PartialFunction[SymbolEntry, TermDecl] = memoize({
     case er: ExtModClassRef =>
       val owner = (er.ownerOption map parseSymbol) getOrElse rootPackageDecl
       ExternalTermRef(er.name, owner) // package or object, undistinguishable here
@@ -202,7 +204,7 @@ class ClassDeclExtractor {
       ExternalModuleRef(er.name, owner) // object
   })
 
-  val createDeclRef: PartialFunction[SymbolEntry, Declaration] = Memoizable({
+  val createDeclRef: PartialFunction[SymbolEntry, Declaration] = memoize({
     case symbolEntry: TypeSym => ExternalTypeRef(symbolEntry.name, createDeclRef(symbolEntry.owner))
     case symbolEntry: AliasSym => ExternalTypeRef(symbolEntry.name, createDeclRef(symbolEntry.owner))
     case symbolEntry: ClassSym => ExternalTypeRef(symbolEntry.name, createDeclRef(symbolEntry.owner))
@@ -212,7 +214,7 @@ class ClassDeclExtractor {
     case symbolEntry: ExtModClassRef => ExternalTermRef(symbolEntry.name, (symbolEntry.ownerOption map createDeclRef) getOrElse rootPackageDecl)
   })
 
-  val parseTypeParameter: PartialFunction[SymbolEntry, TypeParameterDecl] = Memoizable({
+  val parseTypeParameter: PartialFunction[SymbolEntry, TypeParameterDecl] = memoize({
     case ts: TypeSym =>
       def getTypeBoundsEntry(typeEntry: TypeEntry): TypeBoundsType = typeEntry match {
         case tbt: TypeBoundsType => tbt
@@ -232,7 +234,7 @@ class ClassDeclExtractor {
       }
   })
 
-  val parseTypeSymbol: PartialFunction[SymbolEntry, TypeDecl] = parseTypeParameter orElse Memoizable({
+  val parseTypeSymbol: PartialFunction[SymbolEntry, TypeDecl] = parseTypeParameter orElse memoize({
     def typeOwner(symbolEntry: SymbolEntry) = (symbolEntry.ownerOption map parseSymbol) getOrElse rootPackageDecl
     val parseTypeSymbol: PartialFunction[SymbolEntry, TypeDecl] = {
       case er: ExtRef =>
@@ -255,7 +257,7 @@ class ClassDeclExtractor {
 
   val parseSymbol: PartialFunction[SymbolEntry, Declaration] = parseTermSymbol orElse parseTypeSymbol
 
-  val parseValueType: PartialFunction[TypeEntry, Type] = Memoizable({
+  val parseValueType: PartialFunction[TypeEntry, Type] = memoize({
     case trt: TypeRefType =>
       val baseType =
         new TypeProjection {

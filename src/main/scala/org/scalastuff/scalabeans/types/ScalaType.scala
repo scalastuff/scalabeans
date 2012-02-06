@@ -18,13 +18,26 @@ package org.scalastuff.scalabeans
 package types
 
 import scala.reflect.Manifest
-import collection.mutable.{Builder, ArrayBuilder}
-import collection.generic.{MapFactory, GenericCompanion}
+import collection.mutable.{ Builder, ArrayBuilder }
+import collection.generic.{ MapFactory, GenericCompanion }
 
 trait ScalaType {
   def erasure: Class[_]
 
   def arguments: Seq[ScalaType]
+
+  def rewrite(rules: PartialFunction[ScalaType, ScalaType]): ScalaType = {
+    val newArguments =
+      for (arg <- arguments)
+        yield arg.rewrite(rules)
+
+    val res =
+      if (newArguments.corresponds(arguments)(_ eq _)) this
+      else ScalaType(erasure, newArguments)
+
+    if (rules.isDefinedAt(res)) rules(res)
+    else res
+  }
 
   override def equals(other: Any) = other match {
     case that: ScalaType => erasure == that.erasure && arguments == that.arguments
@@ -70,6 +83,23 @@ trait AnyRefType extends ScalaType
 
 object AnyRefType {
   def unapply(t: AnyRefType) = true
+}
+
+trait BeanType extends AnyRefType {
+  lazy val beanDescriptor = Preamble.descriptorOf(this)
+  
+  override def equals(other: Any) = this eq other.asInstanceOf[AnyRef]
+}
+
+object BeanType {
+  def apply(bd: BeanDescriptor): BeanType = apply(bd.manifest, bd.properties)
+  
+  protected[scalabeans] def apply(manifest: Manifest[_], properties: => Seq[PropertyDescriptor]): BeanType =
+    new Impl(manifest.erasure, manifest.typeArguments.map(ScalaType.scalaTypeOf(_)): _*) with BeanType {
+      override lazy val beanDescriptor = BeanDescriptor(manifest, properties)
+    }
+
+  def unapply(t: BeanType) = Some(t.beanDescriptor)
 }
 
 trait OptionType extends AnyRefType with SingleArgument
@@ -139,13 +169,13 @@ object TupleType {
 // ******* Enums ******
 
 trait EnumType extends AnyRefType {
-  def enum : Enum[AnyRef]
-	
+  def enum: Enum[AnyRef]
+
   override def equals(other: Any) = other match {
     case that: EnumType => super.equals(other) && enum == that.enum
     case _ => false
   }
-  
+
   override def hashCode = 41 * (41 + super.hashCode) + enum.hashCode
 }
 
@@ -164,7 +194,8 @@ object JavaEnumType {
 // ******* Arrays ******
 trait ArrayType extends AnyRefType with SingleArgument {
   override def toString() = "Array[" + argument.toString + "]"
-  def newArrayBuilder[A](): ArrayBuilder[A]
+  val componentTypeManifest = ManifestFactory.manifestOf(argument)
+  def newArrayBuilder[A](): ArrayBuilder[A] = componentTypeManifest.newArrayBuilder().asInstanceOf[ArrayBuilder[A]]
 }
 
 object ArrayType {
@@ -180,8 +211,8 @@ trait CollectionType extends AnyRefType with SingleArgument {
       compField.setAccessible(true)
       val companion = compField.get(null)
       companion match {
-        case gc: GenericCompanion[Traversable] => Some({() => gc.newBuilder[Any] })
-        case mapFactory: MapFactory[Map] => Some({() => mapFactory.newBuilder[Any, Any].asInstanceOf[Builder[Any, Traversable[Any]]] })
+        case gc: GenericCompanion[Traversable] => Some({ () => gc.newBuilder[Any] })
+        case mapFactory: MapFactory[Map] => Some({ () => mapFactory.newBuilder[Any, Any].asInstanceOf[Builder[Any, Traversable[Any]]] })
         case _ => None
       }
     } catch {
@@ -380,7 +411,7 @@ object LinkedHashSetType {
 
 trait MapType extends IterableType {
   override def toString() = erasure.getSimpleName + "[" + keyType.toString + "," + valueType + "]"
-  
+
   def keyType = argument.arguments(0)
   def valueType = argument.arguments(1)
 }
@@ -442,78 +473,90 @@ object ScalaType {
   private object TheAnyRefType extends Impl(classOf[AnyRef])
 
   def scalaTypeOf[A](implicit mf: Manifest[A]): ScalaType = {
-    def arg(index: Int): ScalaType = if (index < mf.typeArguments.size) scalaTypeOf(mf.typeArguments(index)) else TheAnyRefType
-    def argTuple2 = new Impl(classOf[Tuple2[_, _]], arg(0), arg(1)) with TupleType
-    
-    def createArrayType(mf: Manifest[_]) = {	  
-	  val contentTypeManifest =
-        if (mf.typeArguments.size > 0) mf.typeArguments(0)
-        else ManifestFactory.manifestOf(mf.erasure.getComponentType)
+    val erasure = mf.erasure
+    val arguments =
+      if (classOf[scala.collection.Map[_, _]].isAssignableFrom(erasure)) {
+        def arg(index: Int): ScalaType = if (index < mf.typeArguments.size) scalaTypeOf(mf.typeArguments(index)) else TheAnyRefType
+        Seq(new Impl(classOf[Tuple2[_, _]], arg(0), arg(1)) with TupleType)        
+      } else {
+        if (erasure.isArray() && mf.typeArguments.isEmpty) List(ManifestFactory.manifestOf(erasure.getComponentType))
+        else mf.typeArguments
+      } map (scalaTypeOf(_)) toSeq
 
-	  new Impl(mf.erasure, scalaTypeOf(contentTypeManifest)) with ArrayType {
-        def newArrayBuilder[A](): ArrayBuilder[A] = contentTypeManifest.newArrayBuilder().asInstanceOf[ArrayBuilder[A]]
-      }
-	}
+    apply(erasure, arguments)
+  }
+
+  import org.scalastuff.util.WeakValuesMemo._
+  
+  private val scalaTypesMemo = memo[(Class[_], Seq[ScalaType]), ScalaType]
     
-    if (classOf[Int] == mf.erasure || classOf[java.lang.Integer] == mf.erasure) IntType
-    else if (classOf[Long] == mf.erasure || classOf[java.lang.Long] == mf.erasure) LongType
-    else if (classOf[Float] == mf.erasure || classOf[java.lang.Float] == mf.erasure) FloatType
-    else if (classOf[Double] == mf.erasure || classOf[java.lang.Double] == mf.erasure) DoubleType
-    else if (classOf[Boolean] == mf.erasure || classOf[java.lang.Boolean] == mf.erasure) BooleanType
-    else if (classOf[Char] == mf.erasure || classOf[java.lang.Character] == mf.erasure) CharType
-    else if (classOf[Short] == mf.erasure || classOf[java.lang.Short] == mf.erasure) ShortType
-    else if (classOf[Byte] == mf.erasure || classOf[java.lang.Byte] == mf.erasure) ByteType
-    else if (classOf[String] == mf.erasure) StringType
-    else if (classOf[BigDecimal] == mf.erasure) BigDecimalType
-    else if (classOf[BigInt] == mf.erasure) BigIntType
-    else if (classOf[java.util.Date] == mf.erasure) DateType
-    else if (classOf[java.sql.Timestamp] == mf.erasure) SqlTimestampType
-    else if (classOf[java.sql.Date] == mf.erasure) SqlDateType
-    else if (classOf[scala.Option[_]] == mf.erasure) new Impl(mf.erasure, arg(0)) with OptionType
-    else if (classOf[scala.Tuple1[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with TupleType
-    else if (classOf[scala.Tuple2[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0), arg(1)) with TupleType
-    else if (classOf[java.lang.Enum[_]].isAssignableFrom(mf.erasure)) new Impl(classOf[java.lang.Enum[_]], new Impl(mf.erasure) with AnyRefType) with JavaEnumType
-    else if (mf.erasure.isArray) createArrayType(mf)
-    else if (classOf[scala.collection.mutable.LinkedHashMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with LinkedHashMapType
-    else if (classOf[scala.collection.immutable.HashMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with ImmutableHashMapType
-    else if (classOf[scala.collection.mutable.HashMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with MutableHashMapType
-    else if (classOf[scala.collection.immutable.TreeMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with TreeMapType
-    else if (classOf[scala.collection.immutable.SortedMap[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with SortedMapType
-    else if (classOf[scala.collection.immutable.Map[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with ImmutableMapType
-    else if (classOf[scala.collection.mutable.Map[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with MutableMapType
-    else if (classOf[scala.collection.Map[_, _]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, argTuple2) with MapType
-    else if (classOf[scala.collection.mutable.LinkedHashSet[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with LinkedHashSetType
-    else if (classOf[scala.collection.immutable.HashSet[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with ImmutableHashSetType
-    else if (classOf[scala.collection.mutable.HashSet[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with MutableHashSetType
-    else if (classOf[scala.collection.immutable.TreeSet[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with TreeSetType
-    else if (classOf[scala.collection.immutable.SortedSet[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with SortedSetType
-    else if (classOf[scala.collection.immutable.Set[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with ImmutableSetType
-    else if (classOf[scala.collection.mutable.Set[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with MutableSetType
-    else if (classOf[scala.collection.Set[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with SetType
-    else if (classOf[scala.collection.mutable.ArrayBuffer[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with ArrayBufferType
-    else if (classOf[scala.collection.mutable.ListBuffer[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with ListBufferType
-    else if (classOf[scala.collection.mutable.Buffer[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with BufferType
-    else if (classOf[scala.collection.immutable.Stream[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with StreamType
-    else if (classOf[scala.collection.immutable.List[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with ListType
-    else if (classOf[scala.collection.mutable.MutableList[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with MutableListType
-    else if (classOf[scala.collection.immutable.LinearSeq[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with ImmutableLinearSeqType
-    else if (classOf[scala.collection.mutable.LinearSeq[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with MutableLinearSeqType
-    else if (classOf[scala.collection.LinearSeq[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with LinearSeqType
-    else if (classOf[scala.collection.mutable.ResizableArray[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with ResizableArrayType
-    else if (classOf[scala.collection.immutable.Vector[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with VectorType
-    else if (classOf[scala.collection.immutable.IndexedSeq[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with ImmutableIndexedSeqType
-    else if (classOf[scala.collection.mutable.IndexedSeq[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with MutableIndexedSeqType
-    else if (classOf[scala.collection.IndexedSeq[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with IndexedSeqType
-    else if (classOf[scala.collection.Seq[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with SeqType
-    else if (classOf[scala.collection.Iterable[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with IterableType
-    else if (classOf[scala.collection.Traversable[_]].isAssignableFrom(mf.erasure)) new Impl(mf.erasure, arg(0)) with TraversableType
-    else Enum.enumOf[AnyRef](mf.erasure) match {
-    	case Some(e) => new Impl(mf.erasure, mf.typeArguments.map(scalaTypeOf(_)): _*) with EnumType {
-    		def enum = e
-    	}
-    	case None => new Impl(mf.erasure, mf.typeArguments.map(scalaTypeOf(_)): _*) with AnyRefType
+  protected def apply(erasure: Class[_], arguments: Seq[ScalaType]): ScalaType = scalaTypesMemo((erasure, arguments)) {
+    def arg(index: Int): ScalaType = if (index < arguments.size) arguments(index) else TheAnyRefType
+
+    if (classOf[Int] == erasure || classOf[java.lang.Integer] == erasure) IntType
+    else if (classOf[Long] == erasure || classOf[java.lang.Long] == erasure) LongType
+    else if (classOf[Float] == erasure || classOf[java.lang.Float] == erasure) FloatType
+    else if (classOf[Double] == erasure || classOf[java.lang.Double] == erasure) DoubleType
+    else if (classOf[Boolean] == erasure || classOf[java.lang.Boolean] == erasure) BooleanType
+    else if (classOf[Char] == erasure || classOf[java.lang.Character] == erasure) CharType
+    else if (classOf[Short] == erasure || classOf[java.lang.Short] == erasure) ShortType
+    else if (classOf[Byte] == erasure || classOf[java.lang.Byte] == erasure) ByteType
+    else if (classOf[String] == erasure) StringType
+    else if (classOf[BigDecimal] == erasure) BigDecimalType
+    else if (classOf[BigInt] == erasure) BigIntType
+    else if (classOf[java.util.Date] == erasure) DateType
+    else if (classOf[java.sql.Timestamp] == erasure) SqlTimestampType
+    else if (classOf[java.sql.Date] == erasure) SqlDateType
+    else if (classOf[scala.Option[_]] == erasure) new Impl(erasure, arg(0)) with OptionType
+    else if (classOf[scala.Tuple1[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with TupleType
+    else if (classOf[scala.Tuple2[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0), arg(1)) with TupleType
+    else if (classOf[java.lang.Enum[_]].isAssignableFrom(erasure)) new Impl(classOf[java.lang.Enum[_]], new Impl(erasure) with AnyRefType) with JavaEnumType
+    else if (erasure.isArray) new Impl(erasure, arg(0)) with ArrayType
+    else if (classOf[scala.collection.mutable.LinkedHashMap[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with LinkedHashMapType
+    else if (classOf[scala.collection.immutable.HashMap[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ImmutableHashMapType
+    else if (classOf[scala.collection.mutable.HashMap[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with MutableHashMapType
+    else if (classOf[scala.collection.immutable.TreeMap[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with TreeMapType
+    else if (classOf[scala.collection.immutable.SortedMap[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with SortedMapType
+    else if (classOf[scala.collection.immutable.Map[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ImmutableMapType
+    else if (classOf[scala.collection.mutable.Map[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with MutableMapType
+    else if (classOf[scala.collection.Map[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with MapType
+    else if (classOf[scala.collection.mutable.LinkedHashSet[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with LinkedHashSetType
+    else if (classOf[scala.collection.immutable.HashSet[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ImmutableHashSetType
+    else if (classOf[scala.collection.mutable.HashSet[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with MutableHashSetType
+    else if (classOf[scala.collection.immutable.TreeSet[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with TreeSetType
+    else if (classOf[scala.collection.immutable.SortedSet[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with SortedSetType
+    else if (classOf[scala.collection.immutable.Set[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ImmutableSetType
+    else if (classOf[scala.collection.mutable.Set[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with MutableSetType
+    else if (classOf[scala.collection.Set[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with SetType
+    else if (classOf[scala.collection.mutable.ArrayBuffer[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ArrayBufferType
+    else if (classOf[scala.collection.mutable.ListBuffer[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ListBufferType
+    else if (classOf[scala.collection.mutable.Buffer[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with BufferType
+    else if (classOf[scala.collection.immutable.Stream[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with StreamType
+    else if (classOf[scala.collection.immutable.List[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ListType
+    else if (classOf[scala.collection.mutable.MutableList[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with MutableListType
+    else if (classOf[scala.collection.immutable.LinearSeq[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ImmutableLinearSeqType
+    else if (classOf[scala.collection.mutable.LinearSeq[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with MutableLinearSeqType
+    else if (classOf[scala.collection.LinearSeq[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with LinearSeqType
+    else if (classOf[scala.collection.mutable.ResizableArray[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ResizableArrayType
+    else if (classOf[scala.collection.immutable.Vector[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with VectorType
+    else if (classOf[scala.collection.immutable.IndexedSeq[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ImmutableIndexedSeqType
+    else if (classOf[scala.collection.mutable.IndexedSeq[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with MutableIndexedSeqType
+    else if (classOf[scala.collection.IndexedSeq[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with IndexedSeqType
+    else if (classOf[scala.collection.Seq[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with SeqType
+    else if (classOf[scala.collection.Iterable[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with IterableType
+    else if (classOf[scala.collection.Traversable[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with TraversableType
+    else Enum.enumOf[AnyRef](erasure) match {
+      case Some(e) => new Impl(erasure, arguments: _*) with EnumType {
+        def enum = e
+      }
+      case None =>
+        if (BeanIntrospector.isBeanClass(erasure)) {
+          new Impl(erasure, arguments: _*) with BeanType
+        } else {
+          new Impl(erasure, arguments: _*) with AnyRefType
+        }
     }
   }
 }
 
-private[scalabeans] abstract class Impl(val erasure: Class[_], val arguments: ScalaType*) extends ScalaType
+private[types] abstract class Impl(val erasure: Class[_], val arguments: ScalaType*) extends ScalaType

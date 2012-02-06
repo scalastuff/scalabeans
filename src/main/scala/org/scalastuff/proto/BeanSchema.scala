@@ -46,11 +46,11 @@ class WriteBeanSchema[T <: AnyRef](val beanDescriptor: BeanDescriptor, val field
 
   def getFieldName(number: Int) = fieldsByNumber(number) map (_.name) getOrElse "unknown"
 
-  def typeClass: Class[T] = beanDescriptor.beanType.erasure.asInstanceOf[Class[T]]
+  def typeClass: Class[T] = beanDescriptor.manifest.erasure.asInstanceOf[Class[T]]
 
-  def messageFullName = beanDescriptor.beanType.erasure.getName
+  def messageFullName = beanDescriptor.manifest.erasure.getName
 
-  def messageName = beanDescriptor.beanType.erasure.getSimpleName
+  def messageName = beanDescriptor.manifest.erasure.getSimpleName
 
   val pipeSchema: Schema[Pipe] = new Pipe.Schema[T](this) {
     protected def transfer(pipe: Pipe, input: Input, output: Output) {

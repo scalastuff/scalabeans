@@ -136,7 +136,7 @@ abstract class BeanBuilder {
 
 class BeanBuilderFactory(val beanDescriptor: BeanDescriptor, properties: List[PropertyDescriptor]) {
   val constructor: Constructor[AnyRef] = {
-    val c = beanDescriptor.beanType.erasure
+    val c = beanDescriptor.manifest.erasure
     require(c.getConstructors().size > 0,
       "Cannot create BeanBuilderFactory for %s: it has no constructors (either abstract class or interface)".
         format(beanDescriptor.toString))

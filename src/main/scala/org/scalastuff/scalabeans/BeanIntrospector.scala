@@ -23,22 +23,10 @@ import Preamble._
 import org.scalastuff.scalabeans.types.ScalaType
 
 object BeanIntrospector {
-  def apply[T <: AnyRef](mf: Manifest[_]): BeanDescriptor = apply[T](Preamble.scalaTypeOf(mf))
-
-  def apply[T <: AnyRef](_beanType: ScalaType) = {
-
-    def getTopLevelClass(c: Class[_]): Class[_] = c.getSuperclass match {
-      case null => c
-      case superClass if superClass == classOf[java.lang.Object] => c
-      case superClass => getTopLevelClass(superClass)
-    }
-
-    val c = _beanType.erasure
-
-    def classExtent(c: Class[_]): List[Class[_]] = {
-      if (c == classOf[AnyRef]) Nil
-      else classExtent(c.getSuperclass) :+ c
-    }
+   
+  def apply[T <: AnyRef](_beanType: ScalaType): BeanDescriptor = apply[T](ManifestFactory.manifestOf(_beanType))
+  def apply[T <: AnyRef](mf: Manifest[_]): BeanDescriptor = {
+    val c = mf.erasure    
 
     /**
      * Constructor. Secondary constructors are not supported
@@ -53,7 +41,7 @@ object BeanIntrospector {
 
     var tag = 0
     var mutablePropertyPosition = 0
-    def createPropertyDescriptor(beanType: ScalaType, name: String, field: Option[Field], getter: Option[Method], setter: Option[Method]) = {
+    def createPropertyDescriptor(beanMF: Manifest[_], name: String, field: Option[Field], getter: Option[Method], setter: Option[Method]) = {
       tag = tag + 1
 
       var ctorIndex = ctorParameterNames.indexOf(name)
@@ -64,72 +52,30 @@ object BeanIntrospector {
         if (ctorIndex >= 0) {
           val accessible = field orElse getter get
 
-          if (accessible.getDeclaringClass == beanType.erasure)
+          if (accessible.getDeclaringClass == beanMF.erasure)
             ctorIndex = -1
         }
       }
 
       val defaultValueMethod =
         if (ctorIndex < 0) None
-        else beanType.erasure.getMethods.find(_.getName == "init$default$" + (ctorIndex + 1))
+        else beanMF.erasure.getMethods.find(_.getName == "init$default$" + (ctorIndex + 1))
 
-      val descriptor = PropertyDescriptor(beanType, tag, mutablePropertyPosition, field, getter, setter, ctorIndex, defaultValueMethod)
+      val descriptor = PropertyDescriptor(beanMF, tag, mutablePropertyPosition, field, getter, setter, ctorIndex, defaultValueMethod)
       if (descriptor.isInstanceOf[MutablePropertyDescriptor] && !descriptor.isInstanceOf[ConstructorParameter])
         mutablePropertyPosition += 1
 
       descriptor
     }
 
-    //
-    // Properties of the class.
-    //
-
-    /**
-     * Searches for the method with given name in the given class. Overridden method discovered if present.
-     */
-    def findMethod(c: Class[_], name: String): Option[Method] = {
-      if (c == null) None
-      else if (c == classOf[AnyRef]) None
-      else c.getDeclaredMethods.find(_.getName == name) orElse findMethod(c.getSuperclass(), name)
-    }
-
-    def typeSupported(scalaType: ScalaType) = {
-      true // TODO: list of supported Java and Scala types ...
-    }
-
-    val fieldProperties = for {
-      c <- classExtent(c)
-      field <- c.getDeclaredFields
-      name = field.getName
-
-      if !name.contains('$')
-      if !field.isSynthetic
-//      if typeSupported(scalaTypeOf(field.getGenericType))
-
-      getter = findMethod(_beanType.erasure, name)
-      setter = findMethod(_beanType.erasure, name + "_$eq")
-    } yield createPropertyDescriptor(_beanType, name, Some(field), getter, setter)
-
-    val methodProperties = for {
-      c <- classExtent(c)
-      getter <- c.getDeclaredMethods
-      name = getter.getName
-
-      if getter.getParameterTypes.length == 0
-      if getter.getReturnType != Void.TYPE
-      if !name.contains('$')
-//      if typeSupported(scalaTypeOf(getter.getGenericReturnType))
-      if !fieldProperties.exists(_.name == name)
-      setter <- c.getDeclaredMethods.find(_.getName == name + "_$eq")
-
-    } yield createPropertyDescriptor(_beanType, name, None, Some(getter), Some(setter))
-
-    new BeanDescriptor {
-      val beanType = _beanType
-      val properties = fieldProperties ++ methodProperties
-
-      val topLevelClass = getTopLevelClass(c)
-    }
+    BeanDescriptor(
+        mf,
+        introspectProperties(c) map {p => createPropertyDescriptor(mf, p.name, p.field, p.getter, p.setter) }
+    )
+  }
+  
+  def isBeanClass(clazz: Class[_]): Boolean = {
+    !clazz.getConstructors().isEmpty //&& !introspectProperties(clazz).isEmpty
   }
   
   def print(c: Class[_], prefix: String = "") : Unit = {
@@ -153,5 +99,56 @@ object BeanIntrospector {
   		val instance = new Enumeration{}
   		println(prefix + "    a" )
   	}
+  }
+  
+  private case class PropertyMirror(name: String, field: Option[Field], getter: Option[Method], setter: Option[Method])  
+  
+  private def introspectProperties(c: Class[_]) = {
+    def classExtent(c: Class[_]): List[Class[_]] = {
+      if (c == classOf[AnyRef]) Nil
+      else classExtent(c.getSuperclass) :+ c
+    }
+    
+    /**
+     * Searches for the method with given name in the given class. Overridden method discovered if present.
+     */
+    def findMethod(c: Class[_], name: String): Option[Method] = {
+      if (c == null) None
+      else if (c == classOf[AnyRef]) None
+      else c.getDeclaredMethods.find(_.getName == name) orElse findMethod(c.getSuperclass(), name)
+    }
+    
+    def typeSupported(scalaType: ScalaType) = {
+      true // TODO: list of supported Java and Scala types ...
+    }
+    
+    val fieldProperties = for {
+      c <- (classExtent(c) toSeq)
+      field <- c.getDeclaredFields
+      name = field.getName
+
+      if !name.contains('$')
+      if !field.isSynthetic
+//      if typeSupported(scalaTypeOf(field.getGenericType))
+
+      getter = findMethod(c, name)
+      setter = findMethod(c, name + "_$eq")
+    } yield PropertyMirror(name, Some(field), getter, setter)
+
+    val methodProperties = for {
+      c <- (classExtent(c) toSeq)
+      getter <- c.getDeclaredMethods
+      name = getter.getName
+
+      if getter.getParameterTypes.length == 0
+      if getter.getReturnType != Void.TYPE
+      if !name.contains('$')
+//      if typeSupported(scalaTypeOf(getter.getGenericReturnType))
+      if !fieldProperties.exists(_.name == name)
+      setter <- c.getDeclaredMethods.find(_.getName == name + "_$eq")
+
+    } yield PropertyMirror(name, None, Some(getter), Some(setter))
+    
+    fieldProperties ++ methodProperties
   }
 }

@@ -52,5 +52,23 @@ package testbeans {
     def funct(x: Int, y: Option[Int]): Int = x
 
     private[this] val priv: Seq[Boolean] = Seq.empty
-  }  
+  }
+  
+  abstract class SuperTestBean[A, E](lista: List[A], val vala: A, var vara: A, arra: Array[A]) {
+    type B
+    type C = String
+    
+    val seqb: Seq[B] = Seq.empty
+    // val arrayb: Array[B] = Array.empty[B] // doesn't compile
+    val arrayc: Array[C] = Array.empty[C]
+    def meth1[D](d: D): Option[D]
+  }
+  
+  class SigTestBean[A](lista: List[A], vala: A, vara: A, arra: Array[A]) extends SuperTestBean[A, Int](lista, vala, vara, arra) {
+    type B = Long
+    
+    def meth1[D](d: D): Option[D] = Option(d)
+    
+    def meth2[D <: C](d: D): Option[D] = Option(d)
+  }
 }
