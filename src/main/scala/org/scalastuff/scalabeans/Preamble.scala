@@ -19,16 +19,16 @@ package org.scalastuff.scalabeans
 import java.lang.reflect.{Modifier, Type}
 import org.scalastuff.scalabeans.types.ScalaType
 
-object Preamble {
+object Preamble extends Rewritables {
   implicit def toRichManifest(mf: Manifest[_]) = new {
     def isFinal = Modifier.isFinal(mf.erasure.getModifiers)
   }
 
-  def descriptorOf[T <: AnyRef](implicit mf: Manifest[T]) = BeanIntrospector[T](mf)
+  def descriptorOf[T <: AnyRef](implicit mf: Manifest[T]) = BeanDescriptor[T](mf)
 
-  def descriptorOf(beanType: ScalaType) = BeanIntrospector[AnyRef](beanType)
+  def descriptorOf(beanType: ScalaType) = BeanDescriptor[AnyRef](beanType)
   
-  def descriptorOf(t: Type) = BeanIntrospector[AnyRef](scalaTypeOf(t))
+  def descriptorOf(t: Type) = BeanDescriptor[AnyRef](scalaTypeOf(t))
   
   def scalaTypeOf[T](implicit mf: Manifest[T]) = ScalaType.scalaTypeOf(mf)
 

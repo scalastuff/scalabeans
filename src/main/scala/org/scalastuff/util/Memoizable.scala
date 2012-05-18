@@ -27,7 +27,7 @@ trait Memoizable[K, V] {
 trait Memo {
   def memo[K, V]: Memoizable[K, V]
 
-  def memoize[K, V](pf: PartialFunction[K, V]) = new PartialFunction[K, V] {
+  def memoize[K, V](pf: PartialFunction[K, V]): PartialFunction[K, V] = new PartialFunction[K, V] {
     val memo = Memo.this.memo[K, V]
 
     def isDefinedAt(x: K): Boolean = pf.isDefinedAt(x)

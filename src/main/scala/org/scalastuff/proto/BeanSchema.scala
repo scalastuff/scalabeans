@@ -160,7 +160,7 @@ object BeanSchema {
     val beanDescriptor = descriptorOf(beanType)
     
     if (beanDescriptor.needsBeanBuilder)
-      throw new IllegalArgumentException("Cannot create MirroSchema for %s: it needs BeanBuilder to be instantiatied".format(beanDescriptor.name))
+      throw new IllegalArgumentException("Cannot create MirrorSchema for %s: it needs BeanBuilder to be instantiatied".format(beanDescriptor.name))
       
     val fields: Seq[MutableMirrorField[T]] = {
       for {

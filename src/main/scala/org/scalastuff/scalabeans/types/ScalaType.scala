@@ -88,15 +88,18 @@ object AnyRefType {
 trait BeanType extends AnyRefType {
   lazy val beanDescriptor = Preamble.descriptorOf(this)
   
+  def copy(_beanDescriptor: => BeanDescriptor) = 
+    new Impl(erasure, arguments: _*) with BeanType {
+      override lazy val beanDescriptor = _beanDescriptor
+    }
+  
   override def equals(other: Any) = this eq other.asInstanceOf[AnyRef]
 }
 
 object BeanType {
-  def apply(bd: BeanDescriptor): BeanType = apply(bd.manifest, bd.properties)
-  
-  protected[scalabeans] def apply(manifest: Manifest[_], properties: => Seq[PropertyDescriptor]): BeanType =
-    new Impl(manifest.erasure, manifest.typeArguments.map(ScalaType.scalaTypeOf(_)): _*) with BeanType {
-      override lazy val beanDescriptor = BeanDescriptor(manifest, properties)
+  def apply(_beanDescriptor: BeanDescriptor): BeanType =
+    new Impl(_beanDescriptor.manifest.erasure, _beanDescriptor.manifest.typeArguments.map(ScalaType.scalaTypeOf(_)): _*) with BeanType {
+      override lazy val beanDescriptor = _beanDescriptor
     }
 
   def unapply(t: BeanType) = Some(t.beanDescriptor)

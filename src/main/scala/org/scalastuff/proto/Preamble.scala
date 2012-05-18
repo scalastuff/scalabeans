@@ -42,7 +42,7 @@ object Preamble {
   /**
    * Schema for bean serialization/deserialization.
    *
-   * Bean must be instantiatable via newInstance() without constructor parameters.
+   * Bean must be instantiable via newInstance() without constructor parameters.
    * No immutable properties in constructor parameters are allowed. If this requirements
    * are not met, use BeanBuilderSchema instead.
    */

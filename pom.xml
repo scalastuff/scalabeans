@@ -37,8 +37,8 @@
 	</contributors>
 	<properties>
 		<project.build.sourcEncoding>UTF-8</project.build.sourcEncoding>
-		<scala.version>2.9.1</scala.version>
-		<protostuff.version>1.0.3</protostuff.version>
+		<scala.version>2.9.2</scala.version>
+		<protostuff.version>1.0.6</protostuff.version>
 	</properties>
 	<build>
 		<sourceDirectory>src/main/scala</sourceDirectory>

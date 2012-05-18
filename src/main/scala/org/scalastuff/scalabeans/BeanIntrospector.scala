@@ -16,99 +16,48 @@
 
 package org.scalastuff.scalabeans
 
-import java.lang.reflect._
+import java.lang.reflect.{ Constructor, Field, Method, Modifier }
 import com.thoughtworks.paranamer.BytecodeReadingParanamer
 import collection.JavaConversions._
 import Preamble._
 import org.scalastuff.scalabeans.types.ScalaType
 
-object BeanIntrospector {
-   
-  def apply[T <: AnyRef](_beanType: ScalaType): BeanDescriptor = apply[T](ManifestFactory.manifestOf(_beanType))
-  def apply[T <: AnyRef](mf: Manifest[_]): BeanDescriptor = {
-    val c = mf.erasure    
-
-    /**
-     * Constructor. Secondary constructors are not supported
-     */
-    val constructor: Option[Constructor[_]] = {
-      if (c.getConstructors().isEmpty) None
-      else Some(c.getConstructors()(0).asInstanceOf[Constructor[_]])
-    }
-
-    val paranamer = new BytecodeReadingParanamer
-    val ctorParameterNames = constructor.map(paranamer.lookupParameterNames(_)).getOrElse(scala.Array[String]())
-
-    var tag = 0
-    var mutablePropertyPosition = 0
-    def createPropertyDescriptor(beanMF: Manifest[_], name: String, field: Option[Field], getter: Option[Method], setter: Option[Method]) = {
-      tag = tag + 1
-
-      var ctorIndex = ctorParameterNames.indexOf(name)
-      if (ctorIndex < 0) {
-        ctorIndex = ctorParameterNames.indexOf("_" + name)
-
-        // check if declared in superclass, otherwise does not allow _name
-        if (ctorIndex >= 0) {
-          val accessible = field orElse getter get
-
-          if (accessible.getDeclaringClass == beanMF.erasure)
-            ctorIndex = -1
-        }
-      }
-
-      val defaultValueMethod =
-        if (ctorIndex < 0) None
-        else beanMF.erasure.getMethods.find(_.getName == "init$default$" + (ctorIndex + 1))
-
-      val descriptor = PropertyDescriptor(beanMF, tag, mutablePropertyPosition, field, getter, setter, ctorIndex, defaultValueMethod)
-      if (descriptor.isInstanceOf[MutablePropertyDescriptor] && !descriptor.isInstanceOf[ConstructorParameter])
-        mutablePropertyPosition += 1
-
-      descriptor
-    }
-
-    BeanDescriptor(
-        mf,
-        introspectProperties(c) map {p => createPropertyDescriptor(mf, p.name, p.field, p.getter, p.setter) }
-    )
-  }
-  
+private[scalabeans] object BeanIntrospector {
   def isBeanClass(clazz: Class[_]): Boolean = {
     !clazz.getConstructors().isEmpty //&& !introspectProperties(clazz).isEmpty
   }
-  
-  def print(c: Class[_], prefix: String = "") : Unit = {
-  	def static(mods : Int) = if (Modifier.isStatic(mods)) " (static)" else "" 
-  	println(prefix + "Class: " + c.getName)
-  	println(prefix + "  Fields: ")
-  	for (f <- c.getDeclaredFields) {
-  		println(prefix + "    " + f.getName + " : " + f.getGenericType + static(f.getModifiers))
-  		if (f.getName == "$outer") print(f.getType, "      ")
-  	}
-  	println(prefix + "  Methods: ")
-  	for (f <- c.getDeclaredMethods) {
-  		println(prefix + "    " + f.getName + " : " + f.getGenericReturnType + static(f.getModifiers))
-  	}
-  	println(prefix + "  Sub classes: ")
-  	for (f <- c.getDeclaredClasses) {
-  		println(prefix + "    " + f.getName + static(f.getModifiers))
-  	}
-  	println(prefix + "  Enum Values: ")
-  	for (f <- c.getMethods filter (m => m.getParameterTypes.isEmpty && classOf[Enumeration$Value].isAssignableFrom(m.getReturnType))) {
-  		val instance = new Enumeration{}
-  		println(prefix + "    a" )
-  	}
+
+  def print(c: Class[_], prefix: String = ""): Unit = {
+    def static(mods: Int) = if (Modifier.isStatic(mods)) " (static)" else ""
+    println(prefix + "Class: " + c.getName)
+    println(prefix + "  Fields: ")
+    for (f <- c.getDeclaredFields) {
+      println(prefix + "    " + f.getName + " : " + f.getGenericType + static(f.getModifiers))
+      if (f.getName == "$outer") print(f.getType, "      ")
+    }
+    println(prefix + "  Methods: ")
+    for (f <- c.getDeclaredMethods) {
+      println(prefix + "    " + f.getName + " : " + f.getGenericReturnType + static(f.getModifiers))
+    }
+    println(prefix + "  Sub classes: ")
+    for (f <- c.getDeclaredClasses) {
+      println(prefix + "    " + f.getName + static(f.getModifiers))
+    }
+    println(prefix + "  Enum Values: ")
+    for (f <- c.getMethods filter (m => m.getParameterTypes.isEmpty && classOf[Enumeration$Value].isAssignableFrom(m.getReturnType))) {
+      val instance = new Enumeration {}
+      println(prefix + "    a")
+    }
   }
-  
-  private case class PropertyMirror(name: String, field: Option[Field], getter: Option[Method], setter: Option[Method])  
-  
-  private def introspectProperties(c: Class[_]) = {
+
+  def introspectProperties(mf: Manifest[_]) = {
+    import PropertyDescriptor.PropertyModel
+
     def classExtent(c: Class[_]): List[Class[_]] = {
       if (c == classOf[AnyRef]) Nil
       else classExtent(c.getSuperclass) :+ c
     }
-    
+
     /**
      * Searches for the method with given name in the given class. Overridden method discovered if present.
      */
@@ -117,11 +66,15 @@ object BeanIntrospector {
       else if (c == classOf[AnyRef]) None
       else c.getDeclaredMethods.find(_.getName == name) orElse findMethod(c.getSuperclass(), name)
     }
-    
+
     def typeSupported(scalaType: ScalaType) = {
       true // TODO: list of supported Java and Scala types ...
     }
-    
+
+    val c = mf.erasure
+
+    var tag = 0 // tag is 1-based property index, see code below
+
     val fieldProperties = for {
       c <- (classExtent(c) toSeq)
       field <- c.getDeclaredFields
@@ -129,11 +82,14 @@ object BeanIntrospector {
 
       if !name.contains('$')
       if !field.isSynthetic
-//      if typeSupported(scalaTypeOf(field.getGenericType))
+      //      if typeSupported(scalaTypeOf(field.getGenericType))
 
       getter = findMethod(c, name)
       setter = findMethod(c, name + "_$eq")
-    } yield PropertyMirror(name, Some(field), getter, setter)
+    } yield {
+      tag = tag + 1
+      PropertyModel(mf, tag, Some(field), getter, setter)
+    }
 
     val methodProperties = for {
       c <- (classExtent(c) toSeq)
@@ -143,12 +99,15 @@ object BeanIntrospector {
       if getter.getParameterTypes.length == 0
       if getter.getReturnType != Void.TYPE
       if !name.contains('$')
-//      if typeSupported(scalaTypeOf(getter.getGenericReturnType))
+      //      if typeSupported(scalaTypeOf(getter.getGenericReturnType))
       if !fieldProperties.exists(_.name == name)
       setter <- c.getDeclaredMethods.find(_.getName == name + "_$eq")
 
-    } yield PropertyMirror(name, None, Some(getter), Some(setter))
-    
+    } yield {
+      tag = tag + 1
+      PropertyModel(mf, tag, None, Some(getter), Some(setter))
+    }
+
     fieldProperties ++ methodProperties
   }
 }

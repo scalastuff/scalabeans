@@ -59,7 +59,11 @@ object BeanValueHandler {
     val cached = cachedHandlers.get(beanType)
     if (cached != null) return cached
 
-    val beanDescriptor = descriptorOf(beanType)
+    val beanDescriptor = beanType match {
+      case BeanType(descriptor) => descriptor
+      case _ => descriptorOf(beanType)
+    }
+    
     val result =
       if (beanDescriptor.needsBeanBuilder) new ImmutableBeanValueHandler(beanDescriptor)
       else new MutableBeanValueHandler(beanType)
