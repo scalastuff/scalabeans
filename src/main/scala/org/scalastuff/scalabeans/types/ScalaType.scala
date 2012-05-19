@@ -26,19 +26,6 @@ trait ScalaType {
 
   def arguments: Seq[ScalaType]
 
-  def rewrite(rules: PartialFunction[ScalaType, ScalaType]): ScalaType = {
-    val newArguments =
-      for (arg <- arguments)
-        yield arg.rewrite(rules)
-
-    val res =
-      if (newArguments.corresponds(arguments)(_ eq _)) this
-      else ScalaType(erasure, newArguments)
-
-    if (rules.isDefinedAt(res)) rules(res)
-    else res
-  }
-
   override def equals(other: Any) = other match {
     case that: ScalaType => erasure == that.erasure && arguments == that.arguments
     case _ => false
@@ -87,13 +74,17 @@ object AnyRefType {
 
 trait BeanType extends AnyRefType {
   lazy val beanDescriptor = Preamble.descriptorOf(this)
-  
-  def copy(_beanDescriptor: => BeanDescriptor) = 
+
+  def copy(_beanDescriptor: => BeanDescriptor) =
     new Impl(erasure, arguments: _*) with BeanType {
       override lazy val beanDescriptor = _beanDescriptor
     }
-  
-  override def equals(other: Any) = this eq other.asInstanceOf[AnyRef]
+
+  override def equals(other: Any) = other match {
+    case other: BeanType =>
+      super.equals(other) && beanDescriptor == other.beanDescriptor
+    case _ => false
+  }
 }
 
 object BeanType {
@@ -161,7 +152,7 @@ object SqlDateType extends SqlDateType {
   def unapply(t: SqlDateType) = true
 }
 
-trait TupleType extends AnyRefType
+trait TupleType extends BeanType
 
 object TupleType {
   def apply(arg1: ScalaType) = new Impl(classOf[Tuple1[_]], arg1) with TupleType
@@ -480,7 +471,7 @@ object ScalaType {
     val arguments =
       if (classOf[scala.collection.Map[_, _]].isAssignableFrom(erasure)) {
         def arg(index: Int): ScalaType = if (index < mf.typeArguments.size) scalaTypeOf(mf.typeArguments(index)) else TheAnyRefType
-        Seq(new Impl(classOf[Tuple2[_, _]], arg(0), arg(1)) with TupleType)        
+        Seq(new Impl(classOf[Tuple2[_, _]], arg(0), arg(1)) with TupleType)
       } else {
         if (erasure.isArray() && mf.typeArguments.isEmpty) List(ManifestFactory.manifestOf(erasure.getComponentType))
         else mf.typeArguments
@@ -490,10 +481,10 @@ object ScalaType {
   }
 
   import org.scalastuff.util.WeakValuesMemo._
-  
+
   private val scalaTypesMemo = memo[(Class[_], Seq[ScalaType]), ScalaType]
-    
-  protected def apply(erasure: Class[_], arguments: Seq[ScalaType]): ScalaType = scalaTypesMemo((erasure, arguments)) {
+
+  private[scalabeans] def apply(erasure: Class[_], arguments: Seq[ScalaType]): ScalaType = scalaTypesMemo((erasure, arguments)) {
     def arg(index: Int): ScalaType = if (index < arguments.size) arguments(index) else TheAnyRefType
 
     if (classOf[Int] == erasure || classOf[java.lang.Integer] == erasure) IntType

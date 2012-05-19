@@ -11,6 +11,11 @@ object WeakValuesMemo extends ConcurrentMapMemo {
   protected def createCache[K, V]: ConcurrentMap[K, V] = new MapMaker().weakValues().makeMap[K, V]()
 }
 
+object ConcurrentMapMemo extends ConcurrentMapMemo {
+  protected def createCache[K, V]: ConcurrentMap[K, V] = new MapMaker().makeMap[K, V]()
+}
+
+
 object HashMapMemo extends Memo {
   def memo[K, V]: Memoizable[K, V] = new Memoizable[K, V] {
     val cache = new HashMap[K, V]
@@ -41,8 +46,10 @@ trait ConcurrentMapMemo extends Memo {
     def apply(arg: K)(computed: => V): V = {
       val cached = cache.get(arg)
       if (cached == null) {
-        cache.putIfAbsent(arg, computed)
-        computed
+        // parameter 'computed' is actually a function!
+        val computedVal = computed
+        cache.putIfAbsent(arg, computedVal)
+        computedVal
       } else {
         cached
       }

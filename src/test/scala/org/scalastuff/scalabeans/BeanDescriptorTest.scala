@@ -204,6 +204,14 @@ class BeanDescriptorTest {
     assertHasRenamedProperty(bd("list").scalaType.arguments(0))
     assertHasRenamedProperty(bd("beanArray").scalaType.arguments(0))
     assertHasRenamedProperty(bd("beanMapArray").scalaType.arguments(0).arguments(0).arguments(1))
+    
+    val st1 = bd("list").scalaType.arguments(0)
+    val st2 = bd("beanArray").scalaType.arguments(0)
+    assertEquals(st1, st2)
+    
+    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
+    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
+    assertEquals(bd1, bd2)
   }
 
   @Test
@@ -226,6 +234,14 @@ class BeanDescriptorTest {
     checkDeepCycle(bd("cyclicSet").scalaType.arguments(0), 10)
     checkDeepCycle(bd("cyclicArray").scalaType.arguments(0), 10)
     checkDeepCycle(bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0), 10)
+    
+    val st1 = bd("renamed").scalaType
+    val st2 = bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0)
+    assertEquals(st1, st2)
+    
+    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
+    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
+    assertEquals(bd1, bd2)
   }
 
   private def assertHasRenamedProperty(beanType: ScalaType) {

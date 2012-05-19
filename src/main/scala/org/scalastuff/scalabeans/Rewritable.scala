@@ -2,11 +2,13 @@ package org.scalastuff.scalabeans
 import org.scalastuff.scalabeans.types.BeanType
 import org.scalastuff.scalabeans.types.ScalaType
 
+import org.scalastuff.util.ConcurrentMapMemo._
+
 sealed trait Rewritable[T] {
   def rewrite(rules: Rules[T]): T
 }
 
-sealed trait Rules[A] extends (A => A)
+sealed trait Rules[A] extends PartialFunction[A, A]
 
 trait Rewritables {
   implicit def property2Schema(pd: PropertyDescriptor): Rewritable[PropertyDescriptor] = new Rewritable[PropertyDescriptor] {
@@ -17,16 +19,72 @@ trait Rewritables {
     def rewrite(rules: Rules[BeanDescriptor]) = rules(bd)
   }
 
-  def propertyRules(rules: PartialFunction[PropertyDescriptor, PropertyDescriptor]): Rules[PropertyDescriptor] = new Rules[PropertyDescriptor] {
-    def apply(pd: PropertyDescriptor) = deepBeanRewrite(pf2rules(rules)(pd), _.rewrite(this))
+  implicit def scalaType2Schema(scalaType: ScalaType): Rewritable[ScalaType] = new Rewritable[ScalaType] {
+    def rewrite(rules: Rules[ScalaType]) = rules(scalaType)
   }
 
-  implicit def beanRules(propertyRules: Rules[PropertyDescriptor]): Rules[BeanDescriptor] = new Rules[BeanDescriptor] {
-    def apply(bd: BeanDescriptor) = rewriteProperties(bd, _.rewrite(propertyRules))
+  def propertyRules(rules: PartialFunction[PropertyDescriptor, PropertyDescriptor]): Rules[PropertyDescriptor] = new Rules[PropertyDescriptor] {    
+    def apply(pd: PropertyDescriptor) = applyMemo(pd) {
+      //println("rules applied to property " + pd)
+      rewritePropertyType(pf2rules(rules)(pd), typeRules)
+    }
+
+    def isDefinedAt(pd: PropertyDescriptor) = rules.isDefinedAt(pd) || typeRules.isDefinedAt(pd.scalaType)
+    
+    private[this] val applyMemo = memo[PropertyDescriptor, PropertyDescriptor]
+    private[this] val typeRules: Rules[ScalaType] = this
+  }
+
+  implicit def beanRulesFromPropertyRules(propertyRules: Rules[PropertyDescriptor]): Rules[BeanDescriptor] = new Rules[BeanDescriptor] {
+    def apply(bd: BeanDescriptor) = applyMemo(bd) {
+      //println("rules applied to bean " + bd)
+      rewriteBeanProperties(bd, propertyRules)
+    }
+
+    def isDefinedAt(bd: BeanDescriptor) = bd.properties.exists(propertyRules.isDefinedAt _)
+
+    private[this] val applyMemo = memo[BeanDescriptor, BeanDescriptor]
   }
 
   def beanRules(rules: PartialFunction[BeanDescriptor, BeanDescriptor]): Rules[BeanDescriptor] = new Rules[BeanDescriptor] {
-    def apply(bd: BeanDescriptor) = rewriteProperties(rules(bd), deepBeanRewrite(_, rules))
+    def apply(bd: BeanDescriptor) = applyMemo(bd) {
+      rewriteBeanProperties(pf2rules(rules)(bd), propertyRules)
+    }
+
+    def isDefinedAt(bd: BeanDescriptor) = rules.isDefinedAt(bd) || bd.properties.exists(propertyRules.isDefinedAt _)
+
+    private[this] val propertyRules = propertyRulesFromTypeRules(typeRulesFromBeanRules(this))
+    private[this] val applyMemo = memo[BeanDescriptor, BeanDescriptor]
+  }
+
+  def typeRules(rules: PartialFunction[ScalaType, ScalaType]) = new Rules[ScalaType] {    
+    def apply(scalaType: ScalaType) = applyMemo(scalaType) {
+      val result =
+        if (scalaType.arguments.exists(isDefinedAt _))
+          ScalaType(scalaType.erasure, scalaType.arguments map apply)
+        else
+          scalaType
+
+      if (rules.isDefinedAt(result)) rules(result)
+      else result
+    }
+
+    def isDefinedAt(scalaType: ScalaType) = rules.isDefinedAt(scalaType) || scalaType.arguments.exists(isDefinedAt _)
+    
+    private[this] val applyMemo = memo[ScalaType, ScalaType]
+  }
+
+  implicit def typeRulesFromBeanRules(beanRules: Rules[BeanDescriptor]) = typeRules {
+    case bt @ BeanType(bd) if beanRules.isDefinedAt(bd) => bt.copy(bd rewrite beanRules)
+  }
+
+  implicit def typeRulesFromPropertyRules(propertyRules: Rules[PropertyDescriptor]): Rules[ScalaType] = {
+    typeRulesFromBeanRules(beanRulesFromPropertyRules(propertyRules))
+  }
+
+  implicit def propertyRulesFromTypeRules(typeRules: Rules[ScalaType]) = new Rules[PropertyDescriptor] {
+    def apply(pd: PropertyDescriptor): PropertyDescriptor = rewritePropertyType(pd, typeRules)
+    def isDefinedAt(pd: PropertyDescriptor) = typeRules.isDefinedAt(pd.scalaType)
   }
 
   private def pf2rules[T](pf: PartialFunction[T, T]) = { x: T =>
@@ -34,19 +92,18 @@ trait Rewritables {
     else x
   }
 
-  private def deepBeanRewrite(pd: PropertyDescriptor, rules: BeanDescriptor => BeanDescriptor) = {
-    val newType = pd.scalaType.rewrite {
-      case bt @ BeanType(bd) => bt.copy(rules(bd))
-    }
+  private def rewritePropertyType(pd: PropertyDescriptor, typeRules: Rules[ScalaType]): PropertyDescriptor = {
+    val newType = pd.scalaType rewrite typeRules
 
     if (newType eq pd.scalaType) pd
     else pd.updateScalaType(newType)
   }
 
-  private def rewriteProperties(bd: BeanDescriptor, rules: PropertyDescriptor => PropertyDescriptor) = {
-    val newProperties = bd.properties map rules
-
-    if (bd.properties.sameElements(newProperties)) bd
-    else bd.updateProperties(newProperties)
+  private def rewriteBeanProperties(bd: BeanDescriptor, rules: Rules[PropertyDescriptor]): BeanDescriptor = {
+    if (bd.properties.exists(rules.isDefinedAt _)) {
+      val newProperties = bd.properties.view map (_.rewrite(rules))
+      bd.updateProperties(newProperties)
+    } else
+      bd
   }
 }
