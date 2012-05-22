@@ -93,15 +93,15 @@ trait Rewritables {
   }
 
   private def rewritePropertyType(pd: PropertyDescriptor, typeRules: Rules[ScalaType]): PropertyDescriptor = {
-    val newType = pd.scalaType rewrite typeRules
-
-    if (newType eq pd.scalaType) pd
-    else pd.updateScalaType(newType)
+    if (typeRules.isDefinedAt(pd.scalaType)) 
+      pd.updateScalaType(pd.scalaType rewrite typeRules)
+    else 
+      pd
   }
 
   private def rewriteBeanProperties(bd: BeanDescriptor, rules: Rules[PropertyDescriptor]): BeanDescriptor = {
     if (bd.properties.exists(rules.isDefinedAt _)) {
-      val newProperties = bd.properties.view map (_.rewrite(rules))
+      val newProperties = bd.properties map (_.rewrite(rules))
       bd.updateProperties(newProperties)
     } else
       bd

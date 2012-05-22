@@ -63,7 +63,7 @@ class EnumTest {
   @Test
   def testEnumType {
     val bd = descriptorOf[EnumTestBean]
-    val pd = bd.property("color").get
+    val pd = bd("color")
     pd.scalaType match {
     	case EnumType(enum) => 
     		println("Enum: " + enum)

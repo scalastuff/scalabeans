@@ -43,8 +43,58 @@ trait BeanDescriptor {
    * @see [[org.scalastuff.scalabeans.ConstructorParameter]]
    */
   def properties: Seq[PropertyDescriptor]
+  
+  /**
+   * Exclude properties with given names.
+   * 
+   * Constructor parameters cannot be excluded.
+   */
+  def exclude(propertyNames: String*) = {
+    val ctorParams = propertyNames filter { propertyName =>
+       this(propertyName).isInstanceOf[ConstructorParameter]
+    }
+    require(ctorParams.isEmpty, "Cannot exclude properties: %s are constructor parameters".format(ctorParams))
+    
+    updateProperties(properties filter {property => !propertyNames.contains(property.name)})
+  }
+  
+  /**
+   * Creates a copy of this BeanDescriptor with new property added
+   */
+  def addProperty[B <: AnyRef, P: Manifest](name: String, getter: B => P, setter: Option[(B, P) => Unit]): BeanDescriptor = {
+    val newTag = (properties.view map (_.tag) max) + 1
+    addProperty(name, getter, setter, newTag)
+  }
+    
+  /**
+   * Creates a copy of this BeanDescriptor with new property added
+   */
+  def addProperty[B <: AnyRef, P: Manifest](name: String, getter: B => P, setter: Option[(B, P) => Unit], newTag: Int): BeanDescriptor = {
+    val newPropertyModel = 
+      new PropertyDescriptor.Model(
+        manifest, 
+        name, 
+        Preamble.scalaTypeOf[P], 
+        newTag, 
+        getter.asInstanceOf[AnyRef => Any], 
+        setter.asInstanceOf[Option[(AnyRef, Any) => Unit]])
+    
+    updateProperties(properties :+ PropertyDescriptor(newPropertyModel, 0, -1, None))
+  }
 
   private[scalabeans] def updateProperties(newProperties: Seq[PropertyDescriptor]) = {
+    def duplicates[A](coll: Seq[A]) = coll groupBy {x => x} filter {case (_, lst) => lst.size > 1} keys
+    
+    val nameDuplicates = duplicates(newProperties map (_.name))
+    require(nameDuplicates.isEmpty, 
+        "Cannot update properties of bean %s, following property names are not unique: %s".
+        format(this, nameDuplicates mkString ","))
+    
+    val tagDuplicates = duplicates(newProperties map (_.tag))
+    require(tagDuplicates.isEmpty, 
+        "Cannot update properties of bean %s, following property tags are not unique: %s".
+        format(this, tagDuplicates mkString ","))
+    
     new BeanDescriptor {
       val manifest = BeanDescriptor.this.manifest
       val constructor = BeanDescriptor.this.constructor
@@ -65,20 +115,9 @@ trait BeanDescriptor {
     }
   }
 
-  /**
-   * Exclude properties with given names.
-   * 
-   * Constructor parameters cannot be excluded.
-   */
-  def exclude(propertyNames: String*) = {
-    val ctorParams = propertyNames filter { propertyName =>
-       this(propertyName).isInstanceOf[ConstructorParameter]
-    }
-    require(ctorParams.isEmpty, "Cannot exclude properties: %s are constructor parameters".format(ctorParams))
-    
-    updateProperties(properties filter {property => !propertyNames.contains(property.name)})
-  }
-
+  @deprecated(message = "Use propertyOption method", since = "0.3")
+  def property(name: String) = propertyOption(name)
+  
   /**
    * Bean property descriptor lookup
    *
@@ -86,7 +125,7 @@ trait BeanDescriptor {
    * @see [[org.scalastuff.scalabeans.MutablePropertyDescriptor]]
    * @see [[org.scalastuff.scalabeans.ConstructorParameter]]
    */
-  def property(name: String): Option[PropertyDescriptor] = properties find (_.name == name)
+  def propertyOption(name: String): Option[PropertyDescriptor] = properties find (_.name == name)
 
   /**
    * Convenience method for getting property descriptor by property name.
@@ -204,11 +243,14 @@ trait BeanDescriptor {
 
     getTopLevelClass(manifest.erasure)
   }
-
-  override def toString = manifest.toString
+  
+  /**
+   * Creates a copy of this BeanDescriptor without constructor.
+   */
+  def withoutConstructor() = BeanDescriptor(manifest, properties map (_.model), None)
 
   /**
-   * Injects constructor in the BeanDescriptor.
+   * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor(ctor: () => AnyRef): BeanDescriptor = {    
     BeanDescriptor(
@@ -219,7 +261,7 @@ trait BeanDescriptor {
   }
     
   /**
-   * Injects constructor in the BeanDescriptor.
+   * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1](ctor: P1 => AnyRef, arg1: Pair[String, Option[() => P1]]): BeanDescriptor = {
     BeanDescriptor(
@@ -230,7 +272,7 @@ trait BeanDescriptor {
   }
   
   /**
-   * Injects constructor in the BeanDescriptor.
+   * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1, P2](ctor: (P1, P2) => AnyRef, arg1: Pair[String, Option[() => P1]], arg2: Pair[String, Option[() => P2]]): BeanDescriptor = {
     BeanDescriptor(
@@ -243,7 +285,7 @@ trait BeanDescriptor {
   }
   
   /**
-   * Injects constructor in the BeanDescriptor.
+   * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1, P2, P3](
       ctor: (P1, P2, P3) => AnyRef, 
@@ -260,7 +302,7 @@ trait BeanDescriptor {
   }
   
   /**
-   * Injects constructor in the BeanDescriptor.
+   * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1, P2, P3, P4](
       ctor: (P1, P2, P3, P4) => AnyRef, 
@@ -278,7 +320,7 @@ trait BeanDescriptor {
   }
   
   /**
-   * Injects constructor in the BeanDescriptor.
+   * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1, P2, P3, P4, P5](
       ctor: (P1, P2, P3, P4, P5) => AnyRef, 
@@ -297,7 +339,7 @@ trait BeanDescriptor {
   }
   
   /**
-   * Injects constructor in the BeanDescriptor.
+   * Creates a copy of this BeanDescriptor using given constructor.
    * 
    * Only bean properties can be used as constructor parameters.
    * 
@@ -317,6 +359,8 @@ trait BeanDescriptor {
         properties.view.map(_.resetValueConvertor()).map(_.model),
         Some(ConstructorModel(ctor, args)))
   }
+  
+  override def toString = manifest.toString
 }
 
 object BeanDescriptor {
@@ -331,7 +375,7 @@ object BeanDescriptor {
 
   private[scalabeans] def apply(
     _manifest: Manifest[_],
-    propertyModels: Seq[PropertyDescriptor.PropertyModel],
+    propertyModels: Seq[PropertyDescriptor.Model],
     ctorModelO: Option[ConstructorModel]) = {
 
     var mutablePropertyIndex = 0

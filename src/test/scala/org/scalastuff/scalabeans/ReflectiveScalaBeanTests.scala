@@ -26,7 +26,7 @@ class IntrospectionScalaBeanTests {
   //@Test
   def testMe {
     val bean = descriptorOf[GreatPerson]
-    println(bean.property("xxxx").get.findAnnotation[Deprecated])
+    println(bean("xxxx").findAnnotation[Deprecated])
 
     for (p <- bean.properties) {
       print(p + ": " + p.getClass.getName)

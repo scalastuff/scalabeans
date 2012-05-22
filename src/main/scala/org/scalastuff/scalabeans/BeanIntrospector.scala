@@ -23,9 +23,9 @@ import Preamble._
 import org.scalastuff.scalabeans.types.ScalaType
 
 private[scalabeans] object BeanIntrospector {
-  def isBeanClass(clazz: Class[_]): Boolean = {
-    !clazz.getConstructors().isEmpty //&& !introspectProperties(clazz).isEmpty
-  }
+//  def isBeanClass(clazz: Class[_]): Boolean = {
+//    !clazz.getConstructors().isEmpty //&& !introspectProperties(clazz).isEmpty
+//  }
 
   def print(c: Class[_], prefix: String = ""): Unit = {
     def static(mods: Int) = if (Modifier.isStatic(mods)) " (static)" else ""
@@ -51,10 +51,9 @@ private[scalabeans] object BeanIntrospector {
   }
 
   def introspectProperties(mf: Manifest[_]) = {
-    import PropertyDescriptor.PropertyModel
-
     def classExtent(c: Class[_]): List[Class[_]] = {
-      if (c == classOf[AnyRef]) Nil
+      if(c == null) Nil
+      else if (c == classOf[AnyRef]) Nil
       else classExtent(c.getSuperclass) :+ c
     }
 
@@ -88,7 +87,7 @@ private[scalabeans] object BeanIntrospector {
       setter = findMethod(c, name + "_$eq")
     } yield {
       tag = tag + 1
-      PropertyModel(mf, tag, Some(field), getter, setter)
+      PropertyDescriptor.Model(mf, tag, Some(field), getter, setter)
     }
 
     val methodProperties = for {
@@ -105,7 +104,7 @@ private[scalabeans] object BeanIntrospector {
 
     } yield {
       tag = tag + 1
-      PropertyModel(mf, tag, None, Some(getter), Some(setter))
+      PropertyDescriptor.Model(mf, tag, None, Some(getter), Some(setter))
     }
 
     fieldProperties ++ methodProperties

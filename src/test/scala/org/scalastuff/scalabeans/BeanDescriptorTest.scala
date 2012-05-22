@@ -16,11 +16,11 @@ class BeanDescriptorTest {
     assertNotNull(immutableCP)
     assertEquals("immutableCP", immutableCP.name)
 
-    val mutableCP = bd.property("mutableCP")
+    val mutableCP = bd.propertyOption("mutableCP")
     assertFalse(mutableCP.isEmpty)
     assertEquals("mutableCP", mutableCP.get.name)
 
-    assertTrue(bd.property("whatever").isEmpty)
+    assertTrue(bd.propertyOption("whatever").isEmpty)
   }
 
   @Test
@@ -50,7 +50,7 @@ class BeanDescriptorTest {
 
     def checkImmutable(name: String, expected: String) {
       val bd = testBD(name)
-      val pd = bd.property(name)
+      val pd = bd.propertyOption(name)
       assertEquals(None, pd)
       assertEquals(5, bd.properties.size)
 
@@ -79,7 +79,7 @@ class BeanDescriptorTest {
     def check(propertyName: String) {
       val bd = descriptorOf[PropertiesTestBean].exclude(propertyName)
 
-      val property1 = bd.property(propertyName)
+      val property1 = bd.propertyOption(propertyName)
       assertEquals(None, property1)
       assertEquals(4, bd.properties.size)
     }
@@ -128,7 +128,7 @@ class BeanDescriptorTest {
 
     def checkImmutable(propertyName: String, expected: Int) {
       val bd = testBD(propertyName)
-      val pd = bd.property(propertyName)
+      val pd = bd.propertyOption(propertyName)
       assertEquals(false, pd.isEmpty)
       assertEquals(5, bd.properties.size)
 
@@ -154,7 +154,7 @@ class BeanDescriptorTest {
   @Test
   def testConvertConstructorParameterType() {
     val bd = descriptorOf[PropertiesTestBean] rewrite propertyRules {
-      case p: PropertyDescriptor if p.scalaType == StringType => p.convertValue[String, Int](_.toInt, _.toString)
+      case p @ PropertyDescriptor(_, StringType) => p.convertValue[String, Int](_.toInt, _.toString)
     }
 
     val bean = bd.newInstance(10, 20).asInstanceOf[PropertiesTestBean]
@@ -176,7 +176,7 @@ class BeanDescriptorTest {
     val bdBefore = descriptorOf[PropertiesTestBean].
       withConstructor({ s1: String => new PropertiesTestBean(s1, "20") }, "immutableCP" -> None).
       rewrite(propertyRules {
-        case p: PropertyDescriptor if p.scalaType == StringType => p.convertValue[String, Int](_.toInt, _.toString)
+        case p @ PropertyDescriptor(_, StringType) => p.convertValue[String, Int](_.toInt, _.toString)
       })
 
     val bdAfter = descriptorOf[PropertiesTestBean] rewrite propertyRules {
@@ -191,19 +191,41 @@ class BeanDescriptorTest {
   }
 
   @Test
-  def testDeepRewrite() {
+  def testDeepRewriteProperty() {
     val bd = descriptorOf[DeepTestBean] rewrite propertyRules {
-      case p: PropertyDescriptor if p.name == "mutable" => p.rename("renamed")
+      case p @ PropertyDescriptor("mutable", _) => p.rename("renamed")
     }
 
     assertEquals(5, bd.properties.size)
-    assertNotNull(bd("renamed"))
+    assertFalse(bd.propertyOption("renamed").isEmpty)
 
     //bd.properties foreach {p => println(p.toString)}
 
-    assertHasRenamedProperty(bd("list").scalaType.arguments(0))
-    assertHasRenamedProperty(bd("beanArray").scalaType.arguments(0))
-    assertHasRenamedProperty(bd("beanMapArray").scalaType.arguments(0).arguments(0).arguments(1))
+    assertHasProperty(bd("list").scalaType.arguments(0), "renamed")
+    assertHasProperty(bd("beanArray").scalaType.arguments(0), "renamed")
+    assertHasProperty(bd("beanMapArray").scalaType.arguments(0).arguments(0).arguments(1), "renamed")
+    
+    val st1 = bd("list").scalaType.arguments(0)
+    val st2 = bd("beanArray").scalaType.arguments(0)
+    assertEquals(st1, st2)
+    
+    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
+    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
+    assertEquals(bd1, bd2)
+  }
+  
+  @Test
+  def testDeepRewriteBean() {
+    val bd = descriptorOf[DeepTestBean] rewrite beanRules {
+      case bd: BeanDescriptor => bd.exclude("mutable")
+    }
+
+    assertEquals(4, bd.properties.size)
+    assertEquals(None, bd.propertyOption("mutable"))
+
+    assertHasNoProperty(bd("list").scalaType.arguments(0), "mutable")
+    assertHasNoProperty(bd("beanArray").scalaType.arguments(0), "mutable")
+    assertHasNoProperty(bd("beanMapArray").scalaType.arguments(0).arguments(0).arguments(1), "mutable")
     
     val st1 = bd("list").scalaType.arguments(0)
     val st2 = bd("beanArray").scalaType.arguments(0)
@@ -215,16 +237,16 @@ class BeanDescriptorTest {
   }
 
   @Test
-  def testCyclicBean {
+  def testCyclicBeanProperty {
     val bd = descriptorOf[CyclicTestBean] rewrite propertyRules {
-      case p: PropertyDescriptor if p.name == "cyclicRef" => p.rename("renamed")
+      case p @ PropertyDescriptor("cyclicRef", _) => p.rename("renamed")
     }
 
     //bd.properties foreach {p => println(p.toString)}
 
     def checkDeepCycle(beanType: ScalaType, counter: Int) {
       if (counter > 0) {
-        assertHasRenamedProperty(beanType)
+        assertHasProperty(beanType, "renamed")
         val renamed = beanType.asInstanceOf[BeanType].beanDescriptor("renamed")
         checkDeepCycle(renamed.scalaType, counter - 1)
       }
@@ -243,12 +265,50 @@ class BeanDescriptorTest {
     val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
     assertEquals(bd1, bd2)
   }
+  
+  @Test
+  def testCyclicBean {
+    val bd = descriptorOf[CyclicTestBean] rewrite beanRules {
+      case bd: BeanDescriptor => bd.exclude("cyclicSet")
+    }
 
-  private def assertHasRenamedProperty(beanType: ScalaType) {
+    //bd.properties foreach {p => println(p.toString)}
+
+    def checkDeepCycle(beanType: ScalaType, counter: Int) {
+      if (counter > 0) {
+        assertHasNoProperty(beanType,"cyclicSet")
+        val renamed = beanType.asInstanceOf[BeanType].beanDescriptor("cyclicRef")
+        checkDeepCycle(renamed.scalaType, counter - 1)
+      }
+    }
+    checkDeepCycle(BeanType(bd), 10)
+    checkDeepCycle(bd("cyclicRef").scalaType, 10)
+    checkDeepCycle(bd("cyclicArray").scalaType.arguments(0), 10)
+    checkDeepCycle(bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0), 10)
+    
+    val st1 = bd("cyclicRef").scalaType
+    val st2 = bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0)
+    assertEquals(st1, st2)
+    
+    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
+    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
+    assertEquals(bd1, bd2)
+  }
+
+  private def assertHasProperty(beanType: ScalaType, propertyName: String) {
     beanType match {
       case BeanType(bd) =>
         //bd.properties foreach {p => println(p.toString)}
-        assertNotNull(bd("renamed"))
+        assertFalse(bd.propertyOption(propertyName).isEmpty)
+      case _ => fail("BeanType expected, %s found".format(beanType))
+    }
+  }
+  
+  private def assertHasNoProperty(beanType: ScalaType, propertyName: String) {
+    beanType match {
+      case BeanType(bd) =>
+        //bd.properties foreach {p => println(p.toString)}
+        assertTrue(bd.propertyOption("mutable").isEmpty)
       case _ => fail("BeanType expected, %s found".format(beanType))
     }
   }

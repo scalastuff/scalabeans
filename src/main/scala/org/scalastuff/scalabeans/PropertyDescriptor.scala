@@ -42,13 +42,13 @@ trait PropertyDescriptor {
   def scalaType = model.scalaType
 
   /**
-   * Converts property value from A to B
+   * Creates a copy of this PropertyDescriptor with property value converted to another type.
    */
   def convertValue[A, B: Manifest](to: A => B, from: B => A) = {
     val newScalaType = scalaTypeOf[B]
     clone(model.copy(scalaType = newScalaType,
       getter = { obj: AnyRef => to(model.getter(obj).asInstanceOf[A]) },
-      setter = model.setter map { setter => { (obj: AnyRef, b: Any) => setter(obj, from(b.asInstanceOf[B])) }},
+      setter = model.setter map { setter => { (obj: AnyRef, b: Any) => setter(obj, from(b.asInstanceOf[B])) } },
       valueConvertor = model.valueConvertor.compose(new PropertyDescriptor.ValueConvertor[A, B](to, from).asInstanceOf[PropertyDescriptor.ValueConvertor[Any, Any]])))
   }
 
@@ -60,6 +60,11 @@ trait PropertyDescriptor {
    * Useful for serialization formats using property ids instead of names (like protobuf).
    */
   def tag: Int = model.tag
+  
+  /**
+   * Creates a copy of this PropertyDescriptor using new tag value
+   */
+  def retag(newTag: Int) = clone(model.copy(tag = newTag))
 
   /**
    * Gets property value from given bean
@@ -84,11 +89,11 @@ trait PropertyDescriptor {
 
   override def toString = "%s : %s // tag: %d".format(name, scalaType.toString, tag)
 
-  private[scalabeans] val model: PropertyDescriptor.PropertyModel
-  private[scalabeans] def updateScalaType(newScalaType: ScalaType) = clone(model.copy(scalaType = newScalaType))
+  private[scalabeans] val model: PropertyDescriptor.Model
+  private[scalabeans] def updateScalaType(newScalaType: => ScalaType) = clone(model.copy(scalaType = newScalaType))
   private[scalabeans] def resetValueConvertor() = clone(model.copy(valueConvertor = PropertyDescriptor.ValueConvertorIdentity))
 
-  protected[this] def clone(newModel: PropertyDescriptor.PropertyModel): ThisType
+  protected[this] def clone(newModel: PropertyDescriptor.Model): ThisType
 }
 
 trait ImmutablePropertyDescriptor extends PropertyDescriptor {
@@ -126,7 +131,7 @@ trait ConstructorParameter extends DeserializablePropertyDescriptor {
 }
 
 object PropertyDescriptor {
-  def apply(model: PropertyModel, index: Int, ctorParameterIndex: Int, _defaultValue: Option[() => Any]): PropertyDescriptor = {
+  private[scalabeans] def apply(model: Model, index: Int, ctorParameterIndex: Int, _defaultValue: Option[() => Any]): PropertyDescriptor = {
 
     model.setter match {
       case Some(_) =>
@@ -144,11 +149,13 @@ object PropertyDescriptor {
     }
   }
 
-  protected def immutable(_model: PropertyModel) = {
+  def unapply(pd: PropertyDescriptor) = Some((pd.name, pd.scalaType))
+
+  protected def immutable(_model: Model) = {
     trait ClonableImpl {
       type ThisType = ImmutablePropertyDescriptor
 
-      def clone(newModel: PropertyModel): ThisType = new ImmutablePropertyDescriptor with ClonableImpl {
+      def clone(newModel: Model): ThisType = new ImmutablePropertyDescriptor with ClonableImpl {
         val model = newModel
       }
     }
@@ -158,13 +165,13 @@ object PropertyDescriptor {
     }
   }
 
-  protected def immutableCP(_model: PropertyModel, _index: Int) = {
+  protected def immutableCP(_model: Model, _index: Int) = {
     trait ClonableImpl {
       type ThisType = ImmutablePropertyDescriptor with ConstructorParameter
 
       val index = _index
-      
-      def clone(newModel: PropertyModel): ThisType = new ImmutablePropertyDescriptor with ConstructorParameter with ClonableImpl {
+
+      def clone(newModel: Model): ThisType = new ImmutablePropertyDescriptor with ConstructorParameter with ClonableImpl {
         val model = newModel
       }
     }
@@ -174,13 +181,13 @@ object PropertyDescriptor {
     }
   }
 
-  protected def mutable(_model: PropertyModel, _index: Int) = {
+  protected def mutable(_model: Model, _index: Int) = {
     trait ClonableImpl {
       type ThisType = MutablePropertyDescriptor
 
       val index = _index
-      
-      def clone(newModel: PropertyModel): ThisType = new MutablePropertyDescriptor with ClonableImpl {
+
+      def clone(newModel: Model): ThisType = new MutablePropertyDescriptor with ClonableImpl {
         val model = newModel
       }
     }
@@ -190,13 +197,13 @@ object PropertyDescriptor {
     }
   }
 
-  protected def mutableCP(_model: PropertyModel, _index: Int) = {
+  protected def mutableCP(_model: Model, _index: Int) = {
     trait ClonableImpl {
       type ThisType = MutablePropertyDescriptor with ConstructorParameter
 
       val index = _index
-      
-      def clone(newModel: PropertyModel): ThisType = new MutablePropertyDescriptor with ConstructorParameter with ClonableImpl {
+
+      def clone(newModel: Model): ThisType = new MutablePropertyDescriptor with ConstructorParameter with ClonableImpl {
         val model = newModel
       }
     }
@@ -207,23 +214,45 @@ object PropertyDescriptor {
   }
 
   private[scalabeans] class ValueConvertor[A, B](val to: A => B, val from: B => A) {
-    def compose[C](other: ValueConvertor[B, C]) = new ValueConvertor[A, C]({a => other.to(to(a))}, {c => from(other.from(c))})
+    def compose[C](other: ValueConvertor[B, C]) = new ValueConvertor[A, C]({ a => other.to(to(a)) }, { c => from(other.from(c)) })
   }
-  private[scalabeans] object ValueConvertorIdentity extends ValueConvertor[Any, Any]({a => a}, {b => b})
-  private[scalabeans] case class PropertyModel(
-    beanManifest: Manifest[_],
-    name: String,
-    scalaType: ScalaType,
-    tag: Int,
-    getter: (AnyRef => Any),
-    setter: Option[(AnyRef, Any) => Unit],
-    defaultValue: Option[() => Any],
-    findAnnotation: (Manifest[_] => Option[_]),
-    isInherited: Boolean,
-    valueConvertor: ValueConvertor[Any, Any]) 
+  
+  private[scalabeans] object ValueConvertorIdentity extends ValueConvertor[Any, Any]({ a => a }, { b => b })
+  private[scalabeans] class Model(
+    val beanManifest: Manifest[_],
+    val name: String,
+    _scalaType: => ScalaType,
+    val tag: Int,
+    val getter: (AnyRef => Any),
+    val setter: Option[(AnyRef, Any) => Unit],
+    val defaultValue: Option[() => Any] = None,
+    val findAnnotation: (Manifest[_] => Option[_]) = { _ => None},
+    val isInherited: Boolean = false,
+    val valueConvertor: ValueConvertor[Any, Any] = ValueConvertorIdentity) {
+    def copy(
+      name: String = this.name,
+      scalaType: => ScalaType = _scalaType,
+      tag: Int = this.tag,
+      getter: (AnyRef => Any) = this.getter,
+      setter: Option[(AnyRef, Any) => Unit] = this.setter,
+      defaultValue: Option[() => Any] = this.defaultValue,
+      valueConvertor: ValueConvertor[Any, Any] = this.valueConvertor) =
+      new Model(
+        this.beanManifest,
+        name,
+        scalaType,
+        tag,
+        getter,
+        setter,
+        defaultValue,
+        this.findAnnotation,
+        this.isInherited,
+        valueConvertor)
+    lazy val scalaType = _scalaType
+  }
 
-  object PropertyModel {
-    def apply(_beanMF: Manifest[_], _tag: Int, field: Option[Field], getter: Option[Method], setter: Option[Method]): PropertyModel = {
+  object Model {
+    def apply(_beanMF: Manifest[_], _tag: Int, field: Option[Field], getter: Option[Method], setter: Option[Method]): Model = {
       val findAnnotation = { mf: Manifest[_] =>
         def findAnnotationHere(annotated: AnnotatedElement) = Option(annotated.getAnnotation(mf.erasure.asInstanceOf[Class[java.lang.annotation.Annotation]]))
 
@@ -233,11 +262,11 @@ object PropertyDescriptor {
 
         findFieldAnnotation orElse findGetterAnnotation orElse findSetterAnnotation
       }
-      
+
       val accessible = field orElse getter get
       val isInherited = accessible.getDeclaringClass() != _beanMF.erasure
 
-      def immutableModelFromField(field: Field, typeHint: Option[ScalaType]) = PropertyModel(
+      def immutableModelFromField(field: Field, typeHint: Option[ScalaType]) = new Model(
         _beanMF,
         field.getName,
         typeHint getOrElse scalaTypeOf(field.getGenericType),
@@ -246,10 +275,9 @@ object PropertyDescriptor {
         None,
         None,
         findAnnotation,
-        isInherited,
-        ValueConvertorIdentity)
+        isInherited)
 
-      def mutableModelFromField(field: Field, typeHint: Option[ScalaType]) = PropertyModel(
+      def mutableModelFromField(field: Field, typeHint: Option[ScalaType]) = new Model(
         _beanMF,
         field.getName,
         typeHint getOrElse scalaTypeOf(field.getGenericType),
@@ -258,10 +286,9 @@ object PropertyDescriptor {
         Some(field.set),
         None,
         findAnnotation,
-        isInherited,
-        ValueConvertorIdentity)
+        isInherited)
 
-      def modelFromGetter(getter: Method, typeHint: Option[ScalaType]) = PropertyModel(
+      def modelFromGetter(getter: Method, typeHint: Option[ScalaType]) = new Model(
         _beanMF,
         getter.getName,
         typeHint getOrElse scalaTypeOf(getter.getGenericReturnType),
@@ -270,10 +297,9 @@ object PropertyDescriptor {
         None,
         None,
         findAnnotation,
-        isInherited,
-        ValueConvertorIdentity)
+        isInherited)
 
-      def modelFromGetterSetter(getter: Method, setter: Method, typeHint: Option[ScalaType]) = PropertyModel(
+      def modelFromGetterSetter(getter: Method, setter: Method, typeHint: Option[ScalaType]) = new Model(
         _beanMF,
         getter.getName,
         typeHint getOrElse scalaTypeOf(getter.getGenericReturnType),
@@ -282,8 +308,7 @@ object PropertyDescriptor {
         Some({ (obj: AnyRef, value: Any) => setter.invoke(obj, value.asInstanceOf[AnyRef]) }),
         None,
         findAnnotation,
-        isInherited,
-        ValueConvertorIdentity)
+        isInherited)
 
       val propertyTypeHint = scalaTypeOf(_beanMF) match {
         //case tt: TupleType => Some(tt.arguments(_tag - 1))

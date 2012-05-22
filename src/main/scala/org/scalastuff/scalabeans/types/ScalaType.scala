@@ -544,11 +544,8 @@ object ScalaType {
         def enum = e
       }
       case None =>
-        if (BeanIntrospector.isBeanClass(erasure)) {
-          new Impl(erasure, arguments: _*) with BeanType
-        } else {
-          new Impl(erasure, arguments: _*) with AnyRefType
-        }
+        if (erasure.isAssignableFrom(classOf[AnyRef]) && classOf[AnyRef].isAssignableFrom(erasure)) TheAnyRefType
+        else new Impl(erasure, arguments: _*) with BeanType
     }
   }
 }
