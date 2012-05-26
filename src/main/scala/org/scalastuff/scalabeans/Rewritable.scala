@@ -8,7 +8,49 @@ sealed trait Rewritable[T] {
   def rewrite(rules: Rules[T]): T
 }
 
-sealed trait Rules[A] extends PartialFunction[A, A]
+/**
+ * Defines rewrite rules for certain type.
+ */
+sealed trait Rules[A] {
+  /**
+   * Applies rules to a value.
+   * 
+   * If no rules are applicable, same value is returned.
+   */
+  def apply(x: A): A
+  
+  /**
+   * Checks either any rules are defined for a value.
+   */
+  def isDefinedAt(x: A): Boolean
+  
+  /**
+   * Composes this rules with fallback rules which are applied if this rules are not applicable.
+   */
+  def orElse(that: Rules[A]) = new Rules[A] {
+    
+    def isDefinedAt(x: A) = Rules.this.isDefinedAt(x) || that.isDefinedAt(x)
+    
+    def apply(x: A) = {
+      if (Rules.this.isDefinedAt(x)) Rules.this.apply(x)
+      else that.apply(x)
+    }
+  }
+  
+  /**
+   * Composes this rules with next rules which are applied to the result of application of this rules.
+   */
+  def andThen(next: Rules[A]) = new Rules[A] {
+    def isDefinedAt(x: A) = Rules.this.isDefinedAt(x) || next.isDefinedAt(x)
+    
+    def apply(x: A) = next.apply(Rules.this.apply(x))
+  }
+}
+
+sealed abstract class EmptyRules[A] extends Rules[A] {
+  def apply(x: A) = x
+  def isDefinedAt(x: A) = false
+}
 
 trait Rewritables {
   implicit def property2Schema(pd: PropertyDescriptor): Rewritable[PropertyDescriptor] = new Rewritable[PropertyDescriptor] {
@@ -23,16 +65,18 @@ trait Rewritables {
     def rewrite(rules: Rules[ScalaType]) = rules(scalaType)
   }
 
-  def propertyRules(rules: PartialFunction[PropertyDescriptor, PropertyDescriptor]): Rules[PropertyDescriptor] = new Rules[PropertyDescriptor] {    
+  object EmptyScalaTypeRules extends EmptyRules[ScalaType]
+
+  def propertyRules(propertyPf: PartialFunction[PropertyDescriptor, PropertyDescriptor]): Rules[PropertyDescriptor] = new Rules[PropertyDescriptor] {
     def apply(pd: PropertyDescriptor) = applyMemo(pd) {
       //println("rules applied to property " + pd)
-      rewritePropertyType(pf2rules(rules)(pd), typeRules)
+      rewritePropertyType(applyPfAsRules(propertyPf, pd), typeRules)
     }
 
-    def isDefinedAt(pd: PropertyDescriptor) = rules.isDefinedAt(pd) || typeRules.isDefinedAt(pd.scalaType)
-    
+    def isDefinedAt(pd: PropertyDescriptor) = propertyPf.isDefinedAt(pd) || typeRules.isDefinedAt(pd.scalaType)
+
     private[this] val applyMemo = memo[PropertyDescriptor, PropertyDescriptor]
-    private[this] val typeRules: Rules[ScalaType] = this
+    private[this] val typeRules: Rules[ScalaType] = typeRulesFromPropertyRules(this)
   }
 
   implicit def beanRulesFromPropertyRules(propertyRules: Rules[PropertyDescriptor]): Rules[BeanDescriptor] = new Rules[BeanDescriptor] {
@@ -46,18 +90,18 @@ trait Rewritables {
     private[this] val applyMemo = memo[BeanDescriptor, BeanDescriptor]
   }
 
-  def beanRules(rules: PartialFunction[BeanDescriptor, BeanDescriptor]): Rules[BeanDescriptor] = new Rules[BeanDescriptor] {
+  def beanRules(beanPf: PartialFunction[BeanDescriptor, BeanDescriptor]): Rules[BeanDescriptor] = new Rules[BeanDescriptor] {
     def apply(bd: BeanDescriptor) = applyMemo(bd) {
-      rewriteBeanProperties(pf2rules(rules)(bd), propertyRules)
+      rewriteBeanProperties(applyPfAsRules(beanPf, bd), propertyRules)
     }
 
-    def isDefinedAt(bd: BeanDescriptor) = rules.isDefinedAt(bd) || bd.properties.exists(propertyRules.isDefinedAt _)
+    def isDefinedAt(bd: BeanDescriptor) = beanPf.isDefinedAt(bd) || bd.properties.exists(propertyRules.isDefinedAt _)
 
     private[this] val propertyRules = propertyRulesFromTypeRules(typeRulesFromBeanRules(this))
     private[this] val applyMemo = memo[BeanDescriptor, BeanDescriptor]
   }
 
-  def typeRules(rules: PartialFunction[ScalaType, ScalaType]) = new Rules[ScalaType] {    
+  def typeRules(scalaTypePf: PartialFunction[ScalaType, ScalaType]) = new Rules[ScalaType] {
     def apply(scalaType: ScalaType) = applyMemo(scalaType) {
       val result =
         if (scalaType.arguments.exists(isDefinedAt _))
@@ -65,12 +109,12 @@ trait Rewritables {
         else
           scalaType
 
-      if (rules.isDefinedAt(result)) rules(result)
+      if (scalaTypePf.isDefinedAt(result)) scalaTypePf(result)
       else result
     }
 
-    def isDefinedAt(scalaType: ScalaType) = rules.isDefinedAt(scalaType) || scalaType.arguments.exists(isDefinedAt _)
-    
+    def isDefinedAt(scalaType: ScalaType) = scalaTypePf.isDefinedAt(scalaType) || scalaType.arguments.exists(isDefinedAt _)
+
     private[this] val applyMemo = memo[ScalaType, ScalaType]
   }
 
@@ -87,15 +131,15 @@ trait Rewritables {
     def isDefinedAt(pd: PropertyDescriptor) = typeRules.isDefinedAt(pd.scalaType)
   }
 
-  private def pf2rules[T](pf: PartialFunction[T, T]) = { x: T =>
+  private def applyPfAsRules[T](pf: PartialFunction[T, T], x: T): T = {
     if (pf.isDefinedAt(x)) pf(x)
     else x
   }
 
   private def rewritePropertyType(pd: PropertyDescriptor, typeRules: Rules[ScalaType]): PropertyDescriptor = {
-    if (typeRules.isDefinedAt(pd.scalaType)) 
+    if (typeRules.isDefinedAt(pd.scalaType))
       pd.updateScalaType(pd.scalaType rewrite typeRules)
-    else 
+    else
       pd
   }
 

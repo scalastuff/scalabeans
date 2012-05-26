@@ -20,6 +20,7 @@ import java.lang.reflect.{ AnnotatedElement, Modifier, Method, Field }
 import Preamble._
 import org.scalastuff.scalabeans.types._
 import org.scalastuff.scalabeans.sig.ScalaTypeCompiler
+import org.scalastuff.util.Convertor
 
 trait PropertyDescriptor {
 
@@ -49,7 +50,7 @@ trait PropertyDescriptor {
     clone(model.copy(scalaType = newScalaType,
       getter = { obj: AnyRef => to(model.getter(obj).asInstanceOf[A]) },
       setter = model.setter map { setter => { (obj: AnyRef, b: Any) => setter(obj, from(b.asInstanceOf[B])) } },
-      valueConvertor = model.valueConvertor.compose(new PropertyDescriptor.ValueConvertor[A, B](to, from).asInstanceOf[PropertyDescriptor.ValueConvertor[Any, Any]])))
+      valueConvertor = model.valueConvertor.compose(Convertor[A, B](to, from).asInstanceOf[Convertor[Any, Any]])))
   }
 
   /**
@@ -213,11 +214,7 @@ object PropertyDescriptor {
     }
   }
 
-  private[scalabeans] class ValueConvertor[A, B](val to: A => B, val from: B => A) {
-    def compose[C](other: ValueConvertor[B, C]) = new ValueConvertor[A, C]({ a => other.to(to(a)) }, { c => from(other.from(c)) })
-  }
-  
-  private[scalabeans] object ValueConvertorIdentity extends ValueConvertor[Any, Any]({ a => a }, { b => b })
+  private[scalabeans] val ValueConvertorIdentity = Convertor.identity[Any]
   private[scalabeans] class Model(
     val beanManifest: Manifest[_],
     val name: String,
@@ -228,7 +225,7 @@ object PropertyDescriptor {
     val defaultValue: Option[() => Any] = None,
     val findAnnotation: (Manifest[_] => Option[_]) = { _ => None},
     val isInherited: Boolean = false,
-    val valueConvertor: ValueConvertor[Any, Any] = ValueConvertorIdentity) {
+    val valueConvertor: Convertor[Any, Any] = ValueConvertorIdentity) {
     def copy(
       name: String = this.name,
       scalaType: => ScalaType = _scalaType,
@@ -236,7 +233,7 @@ object PropertyDescriptor {
       getter: (AnyRef => Any) = this.getter,
       setter: Option[(AnyRef, Any) => Unit] = this.setter,
       defaultValue: Option[() => Any] = this.defaultValue,
-      valueConvertor: ValueConvertor[Any, Any] = this.valueConvertor) =
+      valueConvertor: Convertor[Any, Any] = this.valueConvertor) =
       new Model(
         this.beanManifest,
         name,
