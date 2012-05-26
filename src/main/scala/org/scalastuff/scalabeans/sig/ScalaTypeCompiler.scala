@@ -27,7 +27,7 @@ import Mirror._
  */
 object ScalaTypeCompiler {
 
-  private[this] val classInfoCache = new MapMaker().weakKeys().makeMap[ScalaType, Option[ClassInfo]]()
+  private[this] val classInfoCache = new MapMaker().softKeys().softValues().makeMap[ScalaType, Option[ClassInfo]]()
 
   /**
    * Parses Scala signature to collect property return types.

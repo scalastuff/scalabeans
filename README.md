@@ -35,12 +35,5 @@ If you use Maven, add following lines to your pom.xml:
         <version>0.2</version>
       </dependency>
     </dependencies>
-    <repositories>
-    ...
-      <repository>
-        <id>Sonatype OSS releases</id>
-        <url>http://oss.sonatype.org/content/repositories/releases</url>    
-      </repository>
-    </repositories>
     
 For Scala 2.8.x use scalabeans_2.8.1 artifactId
