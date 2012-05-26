@@ -41,7 +41,7 @@ object ClassDeclExtractor {
   /**
    * Declarations are grouped by the class where they appear in the Scala signature.
    */
-  private[this] val declarationsCache = new MapMaker().weakKeys().makeMap[Class[_], Option[Seq[Mirror.EntityDecl]]]()
+  private[this] val declarationsCache = new MapMaker().softValues().makeMap[Class[_], Option[Seq[Mirror.EntityDecl]]]()
 
   def extract(clazz: Class[_]): Option[Seq[Mirror.EntityDecl]] = {
     val cached = declarationsCache.get(clazz)
