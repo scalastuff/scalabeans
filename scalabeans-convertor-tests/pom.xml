@@ -1,0 +1,29 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<artifactId>scalabeans</artifactId>
+		<groupId>org.scalastuff</groupId>
+		<version>0.3-SNAPSHOT</version>
+		<relativePath>..</relativePath>
+	</parent>
+	<artifactId>scalabeans-convertor-tests</artifactId>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.scalastuff</groupId>
+			<artifactId>scalabeans-core</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.scalatest</groupId>
+			<artifactId>scalatest_2.9.0</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

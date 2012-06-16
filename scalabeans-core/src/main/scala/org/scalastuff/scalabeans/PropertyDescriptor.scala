@@ -20,7 +20,7 @@ import java.lang.reflect.{ AnnotatedElement, Modifier, Method, Field }
 import Preamble._
 import org.scalastuff.scalabeans.types._
 import org.scalastuff.scalabeans.sig.ScalaTypeCompiler
-import org.scalastuff.util.Convertor
+import org.scalastuff.util.Converter
 
 trait PropertyDescriptor {
 
@@ -50,7 +50,7 @@ trait PropertyDescriptor {
     clone(model.copy(scalaType = newScalaType,
       getter = { obj: AnyRef => to(model.getter(obj).asInstanceOf[A]) },
       setter = model.setter map { setter => { (obj: AnyRef, b: Any) => setter(obj, from(b.asInstanceOf[B])) } },
-      valueConvertor = model.valueConvertor.compose(Convertor[A, B](to, from).asInstanceOf[Convertor[Any, Any]])))
+      valueConvertor = model.valueConvertor.compose(Converter[A, B](to, from).asInstanceOf[Converter[Any, Any]])))
   }
 
   /**
@@ -214,7 +214,7 @@ object PropertyDescriptor {
     }
   }
 
-  private[scalabeans] val ValueConvertorIdentity = Convertor.identity[Any]
+  private[scalabeans] val ValueConvertorIdentity = Converter.identity[Any]
   private[scalabeans] class Model(
     val beanManifest: Manifest[_],
     val name: String,
@@ -225,7 +225,7 @@ object PropertyDescriptor {
     val defaultValue: Option[() => Any] = None,
     val findAnnotation: (Manifest[_] => Option[_]) = { _ => None},
     val isInherited: Boolean = false,
-    val valueConvertor: Convertor[Any, Any] = ValueConvertorIdentity) {
+    val valueConvertor: Converter[Any, Any] = ValueConvertorIdentity) {
     def copy(
       name: String = this.name,
       scalaType: => ScalaType = _scalaType,
@@ -233,7 +233,7 @@ object PropertyDescriptor {
       getter: (AnyRef => Any) = this.getter,
       setter: Option[(AnyRef, Any) => Unit] = this.setter,
       defaultValue: Option[() => Any] = this.defaultValue,
-      valueConvertor: Convertor[Any, Any] = this.valueConvertor) =
+      valueConvertor: Converter[Any, Any] = this.valueConvertor) =
       new Model(
         this.beanManifest,
         name,

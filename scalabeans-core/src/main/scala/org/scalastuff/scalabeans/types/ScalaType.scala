@@ -20,6 +20,7 @@ package types
 import scala.reflect.Manifest
 import collection.mutable.{ Builder, ArrayBuilder }
 import collection.generic.{ MapFactory, GenericCompanion }
+import scala.reflect.ScalaSignature
 
 trait ScalaType {
   def erasure: Class[_]
@@ -545,6 +546,7 @@ object ScalaType {
       }
       case None =>
         if (erasure.isAssignableFrom(classOf[AnyRef]) && classOf[AnyRef].isAssignableFrom(erasure)) TheAnyRefType
+        else if (erasure.getAnnotation(classOf[ScalaSignature]) == null) new Impl(erasure, arguments: _*) with AnyRefType
         else new Impl(erasure, arguments: _*) with BeanType
     }
   }

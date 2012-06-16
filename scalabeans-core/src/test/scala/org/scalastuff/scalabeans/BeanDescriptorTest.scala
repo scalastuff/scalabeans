@@ -172,7 +172,7 @@ class BeanDescriptorTest {
       assertEquals("20", bean.mutableCP)
       assertEquals(20, bd.get(bean, "mutableCP"))
     }
-    
+
     val bdBefore = descriptorOf[PropertiesTestBean].
       withConstructor({ s1: String => new PropertiesTestBean(s1, "20") }, "immutableCP" -> None).
       rewrite(propertyRules {
@@ -185,7 +185,7 @@ class BeanDescriptorTest {
 
     val bean1 = bdBefore.newInstance(10).asInstanceOf[PropertiesTestBean]
     check(bean1, bdBefore)
-    
+
     val bean2 = bdAfter.newInstance(10).asInstanceOf[PropertiesTestBean]
     check(bean2, bdAfter)
   }
@@ -204,16 +204,16 @@ class BeanDescriptorTest {
     assertHasProperty(bd("list").scalaType.arguments(0), "renamed")
     assertHasProperty(bd("beanArray").scalaType.arguments(0), "renamed")
     assertHasProperty(bd("beanMapArray").scalaType.arguments(0).arguments(0).arguments(1), "renamed")
-    
+
     val st1 = bd("list").scalaType.arguments(0)
     val st2 = bd("beanArray").scalaType.arguments(0)
     assertEquals(st1, st2)
-    
+
     val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
     val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
     assertEquals(bd1, bd2)
   }
-  
+
   @Test
   def testDeepRewriteBean() {
     val bd = descriptorOf[DeepTestBean] rewrite beanRules {
@@ -226,11 +226,11 @@ class BeanDescriptorTest {
     assertHasNoProperty(bd("list").scalaType.arguments(0), "mutable")
     assertHasNoProperty(bd("beanArray").scalaType.arguments(0), "mutable")
     assertHasNoProperty(bd("beanMapArray").scalaType.arguments(0).arguments(0).arguments(1), "mutable")
-    
+
     val st1 = bd("list").scalaType.arguments(0)
     val st2 = bd("beanArray").scalaType.arguments(0)
     assertEquals(st1, st2)
-    
+
     val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
     val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
     assertEquals(bd1, bd2)
@@ -256,16 +256,16 @@ class BeanDescriptorTest {
     checkDeepCycle(bd("cyclicSet").scalaType.arguments(0), 10)
     checkDeepCycle(bd("cyclicArray").scalaType.arguments(0), 10)
     checkDeepCycle(bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0), 10)
-    
+
     val st1 = bd("renamed").scalaType
     val st2 = bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0)
     assertEquals(st1, st2)
-    
+
     val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
     val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
     assertEquals(bd1, bd2)
   }
-  
+
   @Test
   def testCyclicBean {
     val bd = descriptorOf[CyclicTestBean] rewrite beanRules {
@@ -276,7 +276,7 @@ class BeanDescriptorTest {
 
     def checkDeepCycle(beanType: ScalaType, counter: Int) {
       if (counter > 0) {
-        assertHasNoProperty(beanType,"cyclicSet")
+        assertHasNoProperty(beanType, "cyclicSet")
         val renamed = beanType.asInstanceOf[BeanType].beanDescriptor("cyclicRef")
         checkDeepCycle(renamed.scalaType, counter - 1)
       }
@@ -285,14 +285,26 @@ class BeanDescriptorTest {
     checkDeepCycle(bd("cyclicRef").scalaType, 10)
     checkDeepCycle(bd("cyclicArray").scalaType.arguments(0), 10)
     checkDeepCycle(bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0), 10)
-    
+
     val st1 = bd("cyclicRef").scalaType
     val st2 = bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0)
     assertEquals(st1, st2)
-    
+
     val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
     val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
     assertEquals(bd1, bd2)
+  }
+
+  @Test
+  def testScalaTypeRewrite {
+    val rules = propertyRules {
+      case p @ PropertyDescriptor(_, t) if t.erasure == classOf[java.util.UUID] =>
+        p/*.convertValue(
+          { uuid: java.util.UUID => (uuid.getMostSignificantBits(), uuid.getLeastSignificantBits()) },
+          { bits: (Long, Long) => new java.util.UUID(bits._1, bits._2) })*/
+    }
+
+    val scalaType = scalaTypeOf[ObjectGraph] rewrite rules
   }
 
   private def assertHasProperty(beanType: ScalaType, propertyName: String) {
@@ -303,7 +315,7 @@ class BeanDescriptorTest {
       case _ => fail("BeanType expected, %s found".format(beanType))
     }
   }
-  
+
   private def assertHasNoProperty(beanType: ScalaType, propertyName: String) {
     beanType match {
       case BeanType(bd) =>
@@ -334,5 +346,18 @@ package testbeans {
     var cyclicSet: Set[CyclicTestBean] = _
     var cyclicArray: Array[CyclicTestBean] = _
     var cyclicMap: Map[String, List[CyclicTestBean]] = _
+  }
+
+  class ObjectGraph {
+    var one: One = _
+    var two: Two = _
+  }
+
+  class One {
+    var two: Two = _
+  }
+
+  class Two {
+    var one: One = _
   }
 }

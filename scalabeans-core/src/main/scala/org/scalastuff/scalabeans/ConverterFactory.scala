@@ -2,31 +2,31 @@ package org.scalastuff.scalabeans
 
 import org.scalastuff.scalabeans.types.ScalaType
 import Preamble._
-import org.scalastuff.util.Convertor
+import org.scalastuff.util.Converter
 
 /**
- * Provides interface for creation of Convertor[A, Target] objects for specific ScalaType.
+ * Provides interface for creation of Converter[A, Target] objects for specific ScalaType.
  * 
- * Each target type has it's own convertor factory
- * to produce type-specific Convertor[A, Target] objects.
+ * Each target type has it's own converter factory
+ * to produce type-specific Converter[A, Target] objects.
  * 
  * @see org.scalastuff.util.Convertor 
  */
-trait ConvertorFactory {
+trait ConverterFactory {
   /**
    * Concrete type of the factory
    */
-  type This <: ConvertorFactory
+  type This <: ConverterFactory
 
   /**
-   * Target type of produced convertor
+   * Target type of produced converter
    */
   type Target
 
   /**
-   * Concrete convertor type
+   * Concrete converter type
    */
-  type C[A] <: Convertor[A, Target]
+  type C[A] <: Converter[A, Target]
 
   def withRewriteRules(scalaTypeRules: Rules[ScalaType]): This
 

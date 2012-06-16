@@ -136,7 +136,7 @@ trait BeanDescriptor {
    *
    * @throws IllegalArgumentException if property not found
    */
-  def apply(name: String) = property(name) getOrElse
+  def apply(name: String) = propertyOption(name) getOrElse
     (throw new IllegalArgumentException("Property %s.%s not found".format(this.name, name)))
 
   def constructor: Option[BeanConstructor]
