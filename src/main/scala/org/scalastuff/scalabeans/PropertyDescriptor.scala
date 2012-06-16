@@ -23,18 +23,45 @@ import org.scalastuff.scalabeans.sig.ScalaTypeCompiler
 
 abstract class PropertyDescriptor {
 
+  /**
+   * Property name
+   */
   def name: String
 
+  /**
+   * Shows if this property value can be changed
+   */
   def mutable: Boolean
 
+  /**
+   * Type of the property value
+   */
   def scalaType: ScalaType
 
+  /**
+   * Unique id of the property within the bean. 
+   * 
+   * Current implementation assigns tag to sequential number in the order of appearance (superclass first).
+   * 
+   * Useful for serialization formats using property ids instead of names (like protobuf).
+   */
   def tag: Int
 
+  /**
+   * Gets property value from given bean
+   * 
+   * @param obj bean object
+   */
   def get[A](obj: AnyRef): A
 
+  /**
+   * Looks if property is annotated with given annotation class and returns the annotation instance if found.
+   */
   def findAnnotation[T <: java.lang.annotation.Annotation](implicit mf: Manifest[T]): Option[T]
 
+  /**
+   * Type of the bean this property belongs to.
+   */
   def beanType: ScalaType
 
   //  def javaType: java.lang.reflect.Type

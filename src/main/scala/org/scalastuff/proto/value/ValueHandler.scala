@@ -259,6 +259,36 @@ object ValueHandler {
         output.writeInt32(tag, input.readInt32, repeated)
       }
     })
+    
+    case JavaEnumType(enum) => Some(new ValueHandler {
+      type V = AnyRef
+      
+      override def isDefaultValue(v: V) = false
+      
+      val defaultValue: V = {
+        val constants = enum.erasure.getEnumConstants
+        if (constants.size > 0) constants(0) else null
+      }
+      
+      def transfer(tag: Int, pipe: Pipe, input: Input, output: Output, repeated: Boolean) {
+        output.writeInt32(tag, input.readInt32, repeated)
+      }
+
+      def writeValueTo(tag: Int, output: Output, value: V, repeated: Boolean) {
+        output.writeInt32(tag, value.asInstanceOf[Enum[_]].ordinal, repeated)
+      }
+
+      def readFrom(input: Input) = {
+        val constants = enum.erasure.getEnumConstants.asInstanceOf[Array[Enum[_]]]
+        val ordinal = input.readInt32()
+
+        val properConstant = for {
+          constant <- constants
+          if constant.asInstanceOf[Enum[_]].ordinal == ordinal
+        } yield constant
+        properConstant.headOption getOrElse sys.error("Cannot read enum value of %s: unknown ordinal %d".format(enum.toString, ordinal))
+      }
+    })
 
     case at@ArrayType(componentType) =>
       for (valueHandler <- ValueHandler(componentType))

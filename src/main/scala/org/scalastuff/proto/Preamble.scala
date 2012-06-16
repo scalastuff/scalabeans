@@ -16,11 +16,28 @@
 
 package org.scalastuff.proto
 
+import org.scalastuff.proto.value._
 import org.scalastuff.scalabeans.Preamble._
 
 object Preamble {
-  def readerOf[B <: AnyRef](implicit mf: Manifest[B]) = new BeanReader[B]
-  def writerOf[B <: AnyRef](implicit mf: Manifest[B]) = new BeanWriter[B]
+  def readerOf[B <: AnyRef](implicit mf: Manifest[B]): Reader[B] = {
+    val scalaType = scalaTypeOf[B]
+    ValueHandler(scalaType) match {
+      case Some(beanValueHandler: BeanValueHandler) => new BeanReader[B]()
+      case Some(_) => new WrappedReader[B]() 
+      case None => throw new RuntimeException("Cannot create reader for type %s: this type or one of the type arguments is not supported".format(scalaType))
+    }
+  }
+  
+  
+  def writerOf[B <: AnyRef](implicit mf: Manifest[B]): Writer[B] = {
+    val scalaType = scalaTypeOf[B]
+    ValueHandler(scalaType) match {
+      case Some(beanValueHandler: BeanValueHandler) => new BeanWriter[B]()
+      case Some(_) => new WrappedWriter[B]() 
+      case None => throw new RuntimeException("Cannot create writer for type %s: this type or one of the type arguments is not supported".format(scalaType))
+    }
+  }
 
   /**
    * Schema for bean serialization/deserialization.

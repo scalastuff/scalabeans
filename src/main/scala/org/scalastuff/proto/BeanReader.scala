@@ -20,7 +20,26 @@ import org.scalastuff.proto.value.BeanValueHandler
 import com.dyuproject.protostuff.Input
 import java.io.InputStream
 
-class BeanReader[B <: AnyRef](implicit mf: Manifest[B]) {
+/**
+ * Reads values of given type from InputStream or byte array.
+ * 
+ * Use [[org.scalastuff.proto.Preamble#readerOf]] to get the right instance implementing this interface.
+ * 
+ * @see [[org.scalastuff.proto.SerializationFormat]]
+ */
+trait Reader[A] {
+  def readFrom(input: Input): A
+  def readFrom(buffer: Array[Byte], format: SerializationFormat): A
+  def readFrom(inputStream: InputStream, format: SerializationFormat): A
+  def messageName: String
+}
+
+/**
+ * Implements Reader interface for given bean type
+ *  
+ * @see [[org.scalastuff.proto.Reader]]
+ */
+class BeanReader[B <: AnyRef : Manifest] extends Reader[B] {
   private[this] val beanValueHandler = BeanValueHandler[B]()
 
   def readFrom(input: Input): B = beanValueHandler.beanReadFrom(input).asInstanceOf[B]
@@ -30,4 +49,21 @@ class BeanReader[B <: AnyRef](implicit mf: Manifest[B]) {
   def readFrom(inputStream: InputStream, format: SerializationFormat) = format.readFrom(this, inputStream)
 
   def messageName = beanValueHandler.writeSchema.messageName
+}
+
+/**
+ * Implements Reader interface by delegating all method calls to BeanReader[Tuple1[A]].
+ * 
+ * @see [[org.scalastuff.proto.Reader]]
+ */
+class WrappedReader[A: Manifest] extends Reader[A] {
+  private[this] val wrapped = new BeanReader[Tuple1[A]]
+
+  def readFrom(input: Input): A = wrapped.readFrom(input)._1
+
+  def readFrom(buffer: Array[Byte], format: SerializationFormat) = wrapped.readFrom(buffer, format)._1
+
+  def readFrom(inputStream: InputStream, format: SerializationFormat) = wrapped.readFrom(inputStream, format)._1
+
+  def messageName = "list"
 }

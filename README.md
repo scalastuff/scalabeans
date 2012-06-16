@@ -19,12 +19,6 @@ Further information:
 Getting started
 ===============
 	
-If you use SBT, add following lines to your project:	
-
-    val scalaStuffRepo = "Sonatype OSS releases" at "http://oss.sonatype.org/content/repositories/releases"
-    val scalabeans = "org.scalastuff" % "scalabeans" % "0.2"
-
-
 If you use Maven, add following lines to your pom.xml:
 
     <dependencies>
@@ -32,15 +26,6 @@ If you use Maven, add following lines to your pom.xml:
       <dependency>
         <groupId>org.scalastuff</groupId>
         <artifactId>scalabeans</artifactId>
-        <version>0.2</version>
+        <version>0.3</version>
       </dependency>
     </dependencies>
-    <repositories>
-    ...
-      <repository>
-        <id>Sonatype OSS releases</id>
-        <url>http://oss.sonatype.org/content/repositories/releases</url>    
-      </repository>
-    </repositories>
-    
-For Scala 2.8.x use scalabeans_2.8.1 artifactId

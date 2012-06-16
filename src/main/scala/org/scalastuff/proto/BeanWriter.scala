@@ -16,20 +16,59 @@
 
 package org.scalastuff.proto
 
-import org.scalastuff.proto.value.BeanValueHandler
-import com.dyuproject.protostuff._
 import java.io.OutputStream
+import org.scalastuff.proto.value._
+import com.dyuproject.protostuff.Schema
+import com.dyuproject.protostuff.Output
+import org.scalastuff.scalabeans.types.ScalaType
 
-class BeanWriter[B <: AnyRef](implicit mf: Manifest[B]) {
+/**
+ * Writes values of given type to OutputStream or byte array.
+ * 
+ * Use [[org.scalastuff.proto.Preamble#writerOf]] to get the right instance implementing this interface.
+ * 
+ * @see [[org.scalastuff.proto.SerializationFormat]]
+ */
+trait Writer[B] {
+  def writeTo(output: Output, bean: B): Unit
+  def writeTo(outputStream: OutputStream, obj: B, format: SerializationFormat): Unit
+  def toByteArray(obj: B, format: SerializationFormat): Array[Byte]
+  def schema: Schema[AnyRef]
+}
 
-  def writeTo(output: Output, bean:B) {
+/**
+ * Implements Writer interface for given bean type
+ *  
+ * @see [[org.scalastuff.proto.Writer]]
+ */
+class BeanWriter[B <: AnyRef: Manifest] extends Writer[B] {
+
+  def writeTo(output: Output, bean: B) {
     beanValueHandler.beanWriteTo(output, bean)
   }
 
   def writeTo(outputStream: OutputStream, bean: B, format: SerializationFormat) = format.writeTo(this, bean, outputStream)
-  
+
   def toByteArray(bean: B, format: SerializationFormat) = format.toByteArray(this, bean)
 
   def schema = beanValueHandler.writeSchema.asInstanceOf[Schema[AnyRef]]
+  
   private[this] val beanValueHandler = BeanValueHandler[B]()
+}
+
+/**
+ * Implements Writer interface by delegating all method calls to BeanWriter[Tuple1[A]].
+ * 
+ * @see [[org.scalastuff.proto.Writer]]
+ */
+class WrappedWriter[A: Manifest] extends Writer[A] {
+  def writeTo(output: Output, obj: A) = wrapped.writeTo(output, Tuple1(obj))
+  
+  def writeTo(outputStream: OutputStream, obj: A, format: SerializationFormat) = wrapped.writeTo(outputStream, Tuple1(obj), format)
+  
+  def toByteArray(obj: A, format: SerializationFormat) = wrapped.toByteArray(Tuple1(obj), format)
+  
+  def schema = wrapped.schema
+
+  private[this] val wrapped = new BeanWriter[Tuple1[A]]
 }
