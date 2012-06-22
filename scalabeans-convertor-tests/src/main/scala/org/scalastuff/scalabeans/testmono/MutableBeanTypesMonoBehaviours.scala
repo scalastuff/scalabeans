@@ -1,7 +1,9 @@
-package org.scalastuff.scalabeans
+package org.scalastuff.scalabeans.testmono
+
 import org.scalatest.matchers.ShouldMatchers
 import org.scalatest.FlatSpec
-import java.util.UUID
+import org.scalastuff.scalabeans.Enum
+import scala.util.Random
 
 trait MutableBeanTypesMonoBehaviours  extends MonoBehaviours with ShouldMatchers { self: FlatSpec =>
 
@@ -9,36 +11,35 @@ trait MutableBeanTypesMonoBehaviours  extends MonoBehaviours with ShouldMatchers
 
   def mutableBeanTypesMono() {
     it should "have inverse function for a mutable bean with properties of primitive types" in {
-      checkInverse(createMono[PrimitiveTypesBean], List(new PrimitiveTypesBean, new PrimitiveTypesBean().set1))
+      checkInverse(new PrimitiveTypesBean, new PrimitiveTypesBean().set1)()
     }
 
     it should "have inverse function for a mutable bean with properties of simple types" in {
-      checkInverse(createMono[SimpleTypesBean], List(new SimpleTypesBean, new SimpleTypesBean().set1))
+      checkInverse(new SimpleTypesBean, new SimpleTypesBean().set1)()
     }
 
     it should "have inverse function for a mutable bean with properties of Option types" in {
-      checkInverse(createMono[OptionTestBean], List(new OptionTestBean, new OptionTestBean().set1))
+      checkInverse(new OptionTestBean, new OptionTestBean().set1)()
     }
 
     it should "have inverse function for a mutable bean with properties of scalastuff Enum types" in {
-      checkInverse(createMono[EnumTestBean], List(new EnumTestBean, new EnumTestBean().set1))
+      checkInverse(new EnumTestBean, new EnumTestBean().set1)()
     }
 
     it should "have inverse function for a mutable bean with properties of java Enum types" in {
-      checkInverse(createMono[JavaEnumTestBean], List(new JavaEnumTestBean, new JavaEnumTestBean().set1))
+      checkInverse(new JavaEnumTestBean, new JavaEnumTestBean().set1)()
     }
 
     it should "have inverse function for a mutable bean with default property values" in {
-      checkInverse(createMono[DefaultValuesTestBean], List(new DefaultValuesTestBean, new DefaultValuesTestBean().set1))
+      checkInverse(new DefaultValuesTestBean, new DefaultValuesTestBean().set1)()
     }
 
     it should "have inverse function for a mutable bean with default property value generator" in {
-      checkInverse(createMono[DefaultValueGeneratorTestBean],
-        List(new DefaultValueGeneratorTestBean, new DefaultValueGeneratorTestBean().set1()))
+      checkInverse(new DefaultValueGeneratorTestBean, new DefaultValueGeneratorTestBean().set1())()
     }
     
     it should "have inverse function for a mutable bean with properties of other bean types" in {
-      checkInverse(createMono[CompositeTestBean], List(new CompositeTestBean, new CompositeTestBean().set1()))
+      checkInverse(new CompositeTestBean, new CompositeTestBean().set1())()
     }
   }
 }
@@ -196,10 +197,10 @@ package mutabletestbeans {
   }
 
   class DefaultValueGeneratorTestBean {
-    var id: UUID = UUID.randomUUID
+    var id: Long = Random.nextLong()
     
     def set1() = {
-      id = new UUID(0, 0)
+      id = 0
       this
     }
     
