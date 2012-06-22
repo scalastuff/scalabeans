@@ -4,27 +4,28 @@ import org.scalastuff.proto.value.BeanValueHandler
 import org.scalastuff.proto.value.ValueHandler
 import org.scalastuff.scalabeans.Preamble._
 import org.scalastuff.scalabeans.types.ScalaType
-import org.scalastuff.scalabeans.Rules
 import com.dyuproject.protostuff.Schema
 import org.scalastuff.scalabeans.FormatFactory
 import org.scalastuff.util.Format
+import org.scalastuff.util.Rules
+import org.scalastuff.scalabeans.Metamodel
 
 object ProtobufFormatFactory {
-  def apply(rewriteRules: Rules[ScalaType] = EmptyScalaTypeRules) = new ProtobufFormatFactory(rewriteRules)
+  def apply(rules: Rules[Metamodel] = EmptyMetamodelRules) = new ProtobufFormatFactory(rules)
 }
 
-class ProtobufFormatFactory private(rewriteRules: Rules[ScalaType] = EmptyScalaTypeRules) extends FormatFactory {
+class ProtobufFormatFactory private(rules: Rules[Metamodel] = EmptyMetamodelRules) extends FormatFactory {
   type This = ProtobufFormatFactory
   type F[A] = Format[A]
 
-  def withRewriteRules(scalaTypeRules: Rules[ScalaType]) = new ProtobufFormatFactory(scalaTypeRules)
+  def withRewriteRules(rules: Rules[Metamodel]) = new ProtobufFormatFactory(rules)
     
-  protected def formatFor[T <: AnyRef : Manifest](_scalaType: ScalaType): Format[T] = {
-    val scalaType = _scalaType.rewrite(rewriteRules)
-    ValueHandler(scalaType) match {
+  protected def formatFor[T <: AnyRef : Manifest](metamodel: Metamodel): Format[T] = {
+    val updatedMetamodel = metamodel.rewrite(rules)
+    ValueHandler(updatedMetamodel) match {
       case Some(beanValueHandler: BeanValueHandler) => new ProtobufFormat[T](beanValueHandler)
-      case Some(_) => new WrappedProtobufFormat[T](scalaType) 
-      case None => throw new RuntimeException("Cannot create protobuf format for type %s: this type or one of the type arguments is not supported".format(scalaType))
+      case Some(_) => new WrappedProtobufFormat[T](updatedMetamodel) 
+      case None => throw new RuntimeException("Cannot create protobuf format for type %s: this type or one of the type arguments is not supported".format(updatedMetamodel))
     }
   }
 }

@@ -47,7 +47,7 @@ abstract class MutableMirrorField[B <: AnyRef](tag: Int, propertyDescriptor: Mut
 object MutableMirrorField {
   def apply[B <: AnyRef](tag: Int, prop: PropertyDescriptor) = prop match {
     case mutableProperty: MutablePropertyDescriptor =>
-      for (valueHandler <- ValueHandler(mutableProperty.scalaType))
+      for (valueHandler <- ValueHandler(mutableProperty.metamodel))
       yield {
         valueHandler match {
           case repeatedValueHandler: RepeatedValueHandler =>

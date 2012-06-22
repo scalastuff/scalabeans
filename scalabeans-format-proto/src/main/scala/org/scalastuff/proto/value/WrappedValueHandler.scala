@@ -20,8 +20,9 @@ package value
 import com.dyuproject.protostuff.{Pipe, Output, Input}
 import org.scalastuff.scalabeans.Preamble._
 import org.scalastuff.scalabeans.types._
+import org.scalastuff.scalabeans.Metamodel
 
-class WrappedValueHandler(val valueHandler: ValueHandler, valueType: ScalaType) extends ValueHandler {
+class WrappedValueHandler(val valueHandler: ValueHandler, valueMetamodel: Metamodel) extends ValueHandler {
   type V = valueHandler.V
 
   val defaultValue = valueHandler.defaultValue
@@ -29,7 +30,7 @@ class WrappedValueHandler(val valueHandler: ValueHandler, valueType: ScalaType) 
   override def isDefaultValue(v: V) = valueHandler.isDefaultValue(v)
 
   def writeSchema = readSchema.writeSchema
-  val readSchema = BeanBuilderSchema(descriptorOf(TupleType(valueType)))
+  val readSchema = BeanBuilderSchema(TupleBeanDescriptor(valueMetamodel))
 
   def readFrom(input: Input) = {
     val builder = input.mergeObject(null, readSchema)
@@ -48,8 +49,8 @@ class WrappedValueHandler(val valueHandler: ValueHandler, valueType: ScalaType) 
 }
 
 object WrappedValueHandler {
-  def apply(valueHandler: ValueHandler, valueType: ScalaType) = {
-    if (valueHandler.inlined) new WrappedValueHandler(valueHandler, valueType)
+  def apply(valueHandler: ValueHandler, valueMetamodel: Metamodel) = {
+    if (valueHandler.inlined) new WrappedValueHandler(valueHandler, valueMetamodel)
     else valueHandler
   }
 }

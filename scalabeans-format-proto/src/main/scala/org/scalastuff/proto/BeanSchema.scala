@@ -21,7 +21,6 @@ import com.dyuproject.protostuff.{Pipe, Schema, Output, Input}
 import collection.mutable.{ArrayBuffer, Buffer, HashMap}
 import org.scalastuff.scalabeans._
 import org.scalastuff.scalabeans.Preamble._
-import org.scalastuff.scalabeans.types.BeanType
 
 /**
  * Schema implementation for bean serialization. 
@@ -47,11 +46,11 @@ class WriteBeanSchema[T <: AnyRef](val beanDescriptor: BeanDescriptor, val field
 
   def getFieldName(number: Int) = fieldsByNumber(number) map (_.name) getOrElse "unknown"
 
-  def typeClass: Class[T] = beanDescriptor.manifest.erasure.asInstanceOf[Class[T]]
+  def typeClass: Class[T] = beanDescriptor.scalaType.erasure.asInstanceOf[Class[T]]
 
-  def messageFullName = beanDescriptor.manifest.erasure.getName
+  def messageFullName = beanDescriptor.scalaType.erasure.getName
 
-  def messageName = beanDescriptor.manifest.erasure.getSimpleName
+  def messageName = beanDescriptor.scalaType.erasure.getSimpleName
 
   val pipeSchema: Schema[Pipe] = new Pipe.Schema[T](this) {
     protected def transfer(pipe: Pipe, input: Input, output: Output) {
@@ -155,14 +154,9 @@ class BeanSchema[T <: AnyRef](_beanDescriptor: BeanDescriptor, override val fiel
 }
 
 object BeanSchema {
-  def schemaOf[T <: AnyRef](implicit mf: Manifest[T]): BeanSchema[T] = schemaOf[T](scalaTypeOf(mf))
+  def schemaOf[T <: AnyRef](implicit mf: Manifest[T]): BeanSchema[T] = schemaOf[T](descriptorOf[T])
 
-  def schemaOf[T <: AnyRef](beanType: ScalaType) = {
-    val beanDescriptor = beanType match {
-      case BeanType(bd) => bd
-      case _ => descriptorOf(beanType)
-    }
-    
+  def schemaOf[T <: AnyRef](beanDescriptor: BeanDescriptor) = {
     if (beanDescriptor.needsBeanBuilder)
       throw new IllegalArgumentException("Cannot create MirrorSchema for %s: it needs BeanBuilder to be instantiatied".format(beanDescriptor.name))
       

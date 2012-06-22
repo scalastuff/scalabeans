@@ -50,7 +50,7 @@ private[scalabeans] object BeanIntrospector {
     }
   }
 
-  def introspectProperties(mf: Manifest[_]) = {
+  def introspectProperties(scalaType: ScalaType) = {
     def classExtent(c: Class[_]): List[Class[_]] = {
       if(c == null) Nil
       else if (c == classOf[AnyRef]) Nil
@@ -70,7 +70,7 @@ private[scalabeans] object BeanIntrospector {
       true // TODO: list of supported Java and Scala types ...
     }
 
-    val c = mf.erasure
+    val c = scalaType.erasure
 
     var tag = 0 // tag is 1-based property index, see code below
 
@@ -87,7 +87,7 @@ private[scalabeans] object BeanIntrospector {
       setter = findMethod(c, name + "_$eq")
     } yield {
       tag = tag + 1
-      PropertyDescriptor.Model(mf, tag, Some(field), getter, setter)
+      PropertyDescriptor.Model(scalaType, tag, Some(field), getter, setter)
     }
 
     val methodProperties = for {
@@ -104,7 +104,7 @@ private[scalabeans] object BeanIntrospector {
 
     } yield {
       tag = tag + 1
-      PropertyDescriptor.Model(mf, tag, None, Some(getter), Some(setter))
+      PropertyDescriptor.Model(scalaType, tag, None, Some(getter), Some(setter))
     }
 
     fieldProperties ++ methodProperties

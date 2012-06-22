@@ -16,24 +16,18 @@
 
 package org.scalastuff.scalabeans
 
-import org.scalastuff.scalabeans.types.{ ScalaType, BeanType }
+import org.scalastuff.scalabeans.types.ScalaType
+import org.scalastuff.util.Rules
 
 /**
  * Contains bean information.
  */
-trait BeanDescriptor {
+abstract class BeanDescriptor extends NotConvertedMetamodel {
 
   /**
    * @return bean class name
    */
-  def name = manifest.erasure.getName()
-
-  /**
-   * Encapsulates bean class
-   *
-   * @see [[org.scalastuff.scalabeans.types.ScalaType]]
-   */
-  def manifest: Manifest[_]
+  def name = scalaType.toString()
 
   /**
    * Bean property descriptors
@@ -43,21 +37,21 @@ trait BeanDescriptor {
    * @see [[org.scalastuff.scalabeans.ConstructorParameter]]
    */
   def properties: Seq[PropertyDescriptor]
-  
+
   /**
    * Exclude properties with given names.
-   * 
+   *
    * Constructor parameters cannot be excluded.
    */
   def exclude(propertyNames: String*) = {
     val ctorParams = propertyNames filter { propertyName =>
-       this(propertyName).isInstanceOf[ConstructorParameter]
+      this.propertyOption(propertyName).map(_.isInstanceOf[ConstructorParameter]) getOrElse false
     }
     require(ctorParams.isEmpty, "Cannot exclude properties: %s are constructor parameters".format(ctorParams))
-    
-    updateProperties(properties filter {property => !propertyNames.contains(property.name)})
+
+    updateProperties(properties filter { property => !propertyNames.contains(property.name) })
   }
-  
+
   /**
    * Creates a copy of this BeanDescriptor with new property added
    */
@@ -65,38 +59,54 @@ trait BeanDescriptor {
     val newTag = (properties.view map (_.tag) max) + 1
     addProperty(name, getter, setter, newTag)
   }
-    
+
   /**
    * Creates a copy of this BeanDescriptor with new property added
    */
   def addProperty[B <: AnyRef, P: Manifest](name: String, getter: B => P, setter: Option[(B, P) => Unit], newTag: Int): BeanDescriptor = {
-    val newPropertyModel = 
+    val newPropertyModel =
       new PropertyDescriptor.Model(
-        manifest, 
-        name, 
-        Preamble.scalaTypeOf[P], 
-        newTag, 
-        getter.asInstanceOf[AnyRef => Any], 
+        scalaType,
+        name,
+        Preamble.metamodelOf[P],
+        newTag,
+        getter.asInstanceOf[AnyRef => Any],
         setter.asInstanceOf[Option[(AnyRef, Any) => Unit]])
-    
+
     updateProperties(properties :+ PropertyDescriptor(newPropertyModel, 0, -1, None))
   }
+  
+  /**
+   * Rewrite properties of this BeanDescriptor applying given partial function 
+   * to properties as Rules.
+   * 
+   * This method differs from rewrtieChildMetamodels(..) by its shallowness: changes are
+   * not propagated to child metamodels.
+   */
+  def rewriteProperties(pf: PartialFunction[PropertyDescriptor, PropertyDescriptor]) = {
+    val propertyRules = Rules(pf)
+    
+    updateProperties(properties.map {pd => propertyRules(pd)})
+  }
+  
+  def rewriteChildMetamodels(rules: Rules[Metamodel]) =
+    updateProperties(properties.map {pd => pd.rewriteMetamodel(rules)})
 
   private[scalabeans] def updateProperties(newProperties: Seq[PropertyDescriptor]) = {
-    def duplicates[A](coll: Seq[A]) = coll groupBy {x => x} filter {case (_, lst) => lst.size > 1} keys
-    
+    def duplicates[A](coll: Seq[A]) = coll groupBy { x => x } filter { case (_, lst) => lst.size > 1 } keys
+
     val nameDuplicates = duplicates(newProperties map (_.name))
-    require(nameDuplicates.isEmpty, 
-        "Cannot update properties of bean %s, following property names are not unique: %s".
+    require(nameDuplicates.isEmpty,
+      "Cannot update properties of bean %s, following property names are not unique: %s".
         format(this, nameDuplicates mkString ","))
-    
+
     val tagDuplicates = duplicates(newProperties map (_.tag))
-    require(tagDuplicates.isEmpty, 
-        "Cannot update properties of bean %s, following property tags are not unique: %s".
+    require(tagDuplicates.isEmpty,
+      "Cannot update properties of bean %s, following property tags are not unique: %s".
         format(this, tagDuplicates mkString ","))
-    
+
     new BeanDescriptor {
-      val manifest = BeanDescriptor.this.manifest
+      val scalaType = BeanDescriptor.this.scalaType
       val constructor = BeanDescriptor.this.constructor
 
       val properties = { // reindex mutable properties
@@ -117,7 +127,7 @@ trait BeanDescriptor {
 
   @deprecated(message = "Use propertyOption method", since = "0.3")
   def property(name: String) = propertyOption(name)
-  
+
   /**
    * Bean property descriptor lookup
    *
@@ -141,7 +151,7 @@ trait BeanDescriptor {
 
   def constructor: Option[BeanConstructor]
 
-  private[this] lazy val builderFactory = new BeanBuilderFactory(this, properties.toList)
+  private[this] lazy val builderFactory = new BeanBuilderFactory(this)
 
   /**
    * Creates new BeanBuilder instance.
@@ -155,7 +165,7 @@ trait BeanDescriptor {
    *
    * Returns true if one of the constructor parameters:
    *  * is immutable: only way to set it is via constructor
-   *  * doesnt have default value
+   *  * doesn't have default value
    */
   def needsBeanBuilder: Boolean = {
     properties exists { prop =>
@@ -243,138 +253,137 @@ trait BeanDescriptor {
 
     getTopLevelClass(manifest.erasure)
   }
-  
+
   /**
    * Creates a copy of this BeanDescriptor without constructor.
    */
-  def withoutConstructor() = BeanDescriptor(manifest, properties map (_.model), None)
+  def withoutConstructor() = BeanDescriptor(scalaType, properties map (_.model), None)
 
   /**
    * Creates a copy of this BeanDescriptor using given constructor.
    */
-  def withConstructor(ctor: () => AnyRef): BeanDescriptor = {    
+  def withConstructor(ctor: () => AnyRef): BeanDescriptor = {
     BeanDescriptor(
-        manifest,
-        properties.view.map(_.resetValueConvertor()).map(_.model),
-        Some(ConstructorModel({ args: Array[AnyRef] => ctor() }, Seq.empty))
-        )
+      scalaType,
+      properties.view.map(_.model.resetCtorArgMetamodel),
+      Some(ConstructorModel({ args: Array[AnyRef] => ctor() }, Seq.empty)))
   }
-    
+
   /**
    * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1](ctor: P1 => AnyRef, arg1: Pair[String, Option[() => P1]]): BeanDescriptor = {
     BeanDescriptor(
-        manifest,
-        properties.view.map(_.resetValueConvertor()).map(_.model),
-        Some(ConstructorModel({ args: Array[AnyRef] => ctor(args(0).asInstanceOf[P1]) }, Seq(arg1)))
-        )
+      scalaType,
+      properties.view.map(_.model.resetCtorArgMetamodel),
+      Some(ConstructorModel({ args: Array[AnyRef] => ctor(args(0).asInstanceOf[P1]) }, Seq(arg1))))
   }
-  
+
   /**
    * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1, P2](ctor: (P1, P2) => AnyRef, arg1: Pair[String, Option[() => P1]], arg2: Pair[String, Option[() => P2]]): BeanDescriptor = {
     BeanDescriptor(
-        manifest,
-        properties.view.map(_.resetValueConvertor()).map(_.model),
-        Some(ConstructorModel({ args: Array[AnyRef] => 
-          ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2]) }, 
-          Seq(arg1, arg2)))
-        )
+      scalaType,
+      properties.view.map(_.model.resetCtorArgMetamodel),
+      Some(ConstructorModel({ args: Array[AnyRef] =>
+        ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2])
+      },
+        Seq(arg1, arg2))))
   }
-  
+
   /**
    * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1, P2, P3](
-      ctor: (P1, P2, P3) => AnyRef, 
-      arg1: Pair[String, Option[() => P1]], 
-      arg2: Pair[String, Option[() => P2]],
-      arg3: Pair[String, Option[() => P3]]): BeanDescriptor = {
+    ctor: (P1, P2, P3) => AnyRef,
+    arg1: Pair[String, Option[() => P1]],
+    arg2: Pair[String, Option[() => P2]],
+    arg3: Pair[String, Option[() => P3]]): BeanDescriptor = {
     BeanDescriptor(
-        manifest,
-        properties.view.map(_.resetValueConvertor()).map(_.model),
-        Some(ConstructorModel({ args: Array[AnyRef] => 
-          ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2], args(2).asInstanceOf[P3]) }, 
-          Seq(arg1, arg2, arg3)))
-        )
+      scalaType,
+      properties.view.map(_.model.resetCtorArgMetamodel),
+      Some(ConstructorModel({ args: Array[AnyRef] =>
+        ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2], args(2).asInstanceOf[P3])
+      },
+        Seq(arg1, arg2, arg3))))
   }
-  
+
   /**
    * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1, P2, P3, P4](
-      ctor: (P1, P2, P3, P4) => AnyRef, 
-      arg1: Pair[String, Option[() => P1]], 
-      arg2: Pair[String, Option[() => P2]],
-      arg3: Pair[String, Option[() => P3]],
-      arg4: Pair[String, Option[() => P4]]): BeanDescriptor = {
+    ctor: (P1, P2, P3, P4) => AnyRef,
+    arg1: Pair[String, Option[() => P1]],
+    arg2: Pair[String, Option[() => P2]],
+    arg3: Pair[String, Option[() => P3]],
+    arg4: Pair[String, Option[() => P4]]): BeanDescriptor = {
     BeanDescriptor(
-        manifest,
-        properties.view.map(_.resetValueConvertor()).map(_.model),
-        Some(ConstructorModel({ args: Array[AnyRef] => 
-          ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2], args(2).asInstanceOf[P3], args(3).asInstanceOf[P4]) }, 
-          Seq(arg1, arg2, arg3, arg4)))
-        )
+      scalaType,
+      properties.view.map(_.model.resetCtorArgMetamodel),
+      Some(ConstructorModel({ args: Array[AnyRef] =>
+        ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2], args(2).asInstanceOf[P3], args(3).asInstanceOf[P4])
+      },
+        Seq(arg1, arg2, arg3, arg4))))
   }
-  
+
   /**
    * Creates a copy of this BeanDescriptor using given constructor.
    */
   def withConstructor[P1, P2, P3, P4, P5](
-      ctor: (P1, P2, P3, P4, P5) => AnyRef, 
-      arg1: Pair[String, Option[() => P1]], 
-      arg2: Pair[String, Option[() => P2]],
-      arg3: Pair[String, Option[() => P3]],
-      arg4: Pair[String, Option[() => P4]],
-      arg5: Pair[String, Option[() => P5]]): BeanDescriptor = {
+    ctor: (P1, P2, P3, P4, P5) => AnyRef,
+    arg1: Pair[String, Option[() => P1]],
+    arg2: Pair[String, Option[() => P2]],
+    arg3: Pair[String, Option[() => P3]],
+    arg4: Pair[String, Option[() => P4]],
+    arg5: Pair[String, Option[() => P5]]): BeanDescriptor = {
     BeanDescriptor(
-        manifest,
-        properties.view.map(_.resetValueConvertor()).map(_.model),
-        Some(ConstructorModel({ args: Array[AnyRef] => 
-          ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2], args(2).asInstanceOf[P3], args(3).asInstanceOf[P4], args(4).asInstanceOf[P5]) }, 
-          Seq(arg1, arg2, arg3, arg4, arg5)))
-        )
+      scalaType,
+      properties.view.map(_.model.resetCtorArgMetamodel),
+      Some(ConstructorModel({ args: Array[AnyRef] =>
+        ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2], args(2).asInstanceOf[P3], args(3).asInstanceOf[P4], args(4).asInstanceOf[P5])
+      },
+        Seq(arg1, arg2, arg3, arg4, arg5))))
   }
-  
+
   /**
    * Creates a copy of this BeanDescriptor using given constructor.
-   * 
+   *
    * Only bean properties can be used as constructor parameters.
-   * 
+   *
    * @param ctor Bean constructor. Size of the array supplied to this function at runtime
    *             will be equal to the number of property names provided. Actual types will
    *             be assignable to the corresponding property types. If type conversion was
    *             applied to the properties '''before''' injection of new constructor,
-   *             converted (new) types will be supplied to the constructor. 
-   *             
+   *             converted (new) types will be supplied to the constructor.
+   *
    * @param args Property names used as constructor parameters with optional default values.
-   * 
+   *
    * See convenience withConstructor methods with up to 5 arguments in the constructor function.
    */
   def withConstructor(ctor: Array[AnyRef] => AnyRef, args: Pair[String, Option[() => Any]]*) = {
     BeanDescriptor(
-        manifest,
-        properties.view.map(_.resetValueConvertor()).map(_.model),
-        Some(ConstructorModel(ctor, args)))
+      scalaType,
+      properties.view.map(_.model.resetCtorArgMetamodel),
+      Some(ConstructorModel(ctor, args)))
   }
-  
-  override def toString = manifest.toString
+
+  override def toString = scalaType.toString
 }
 
 object BeanDescriptor {
+  import Preamble._
 
-  def apply[T <: AnyRef](_beanType: ScalaType): BeanDescriptor = apply[T](ManifestFactory.manifestOf(_beanType))
-  def apply[T <: AnyRef](_manifest: Manifest[_]): BeanDescriptor = {
-    val propertyModels = BeanIntrospector.introspectProperties(_manifest)
-    val ctorModel = ConstructorModel.introspectDefaultConstructor(_manifest.erasure)
+  def apply[T <: AnyRef: Manifest]: BeanDescriptor = apply(scalaTypeOf[T])
+  def apply(_beanType: ScalaType): BeanDescriptor = {
+    val propertyModels = BeanIntrospector.introspectProperties(_beanType)
+    val ctorModel = ConstructorModel.introspectDefaultConstructor(_beanType.erasure)
 
-    apply(_manifest, propertyModels, ctorModel)
+    apply(_beanType, propertyModels, ctorModel)
   }
 
   private[scalabeans] def apply(
-    _manifest: Manifest[_],
+    _beanType: ScalaType,
     propertyModels: Seq[PropertyDescriptor.Model],
     ctorModelO: Option[ConstructorModel]) = {
 
@@ -404,7 +413,7 @@ object BeanDescriptor {
       }
 
     new BeanDescriptor {
-      val manifest = _manifest
+      val scalaType = _beanType
       val properties = _properties
       val constructor = ctorModelO map { ctorModel =>
         new BeanConstructor {

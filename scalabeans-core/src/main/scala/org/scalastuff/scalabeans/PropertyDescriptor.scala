@@ -21,6 +21,7 @@ import Preamble._
 import org.scalastuff.scalabeans.types._
 import org.scalastuff.scalabeans.sig.ScalaTypeCompiler
 import org.scalastuff.util.Converter
+import org.scalastuff.util.Rules
 
 trait PropertyDescriptor {
 
@@ -38,20 +39,25 @@ trait PropertyDescriptor {
   def mutable: Boolean
 
   /**
-   * Type of the property value
+   * Metamodel of the property value
    */
-  def scalaType = model.scalaType
+  def metamodel = model.metamodel
 
+  def rewriteMetamodel(rules: Rules[Metamodel]) = clone(model.rewriteMetamodel(rules))
+  
+  def updateMetamodel(_metamodel: Metamodel) = rewriteMetamodel(metamodelRules {
+    case Metamodel(model.metamodel.visibleMetamodel.scalaType) => LeafMetamodel(_metamodel)
+  })
+  
   /**
-   * Creates a copy of this PropertyDescriptor with property value converted to another type.
+   * Type of the visible value
    */
-  def convertValue[A, B: Manifest](to: A => B, from: B => A) = {
-    val newScalaType = scalaTypeOf[B]
-    clone(model.copy(scalaType = newScalaType,
-      getter = { obj: AnyRef => to(model.getter(obj).asInstanceOf[A]) },
-      setter = model.setter map { setter => { (obj: AnyRef, b: Any) => setter(obj, from(b.asInstanceOf[B])) } },
-      valueConvertor = model.valueConvertor.compose(Converter[A, B](to, from).asInstanceOf[Converter[Any, Any]])))
-  }
+  def visibleType = metamodel.visibleMetamodel.scalaType
+  
+  /**
+   * Original type of the property value (without any conversions)
+   */
+  def underlyingType = metamodel.scalaType
 
   /**
    * Unique id of the property within the bean.
@@ -61,18 +67,35 @@ trait PropertyDescriptor {
    * Useful for serialization formats using property ids instead of names (like protobuf).
    */
   def tag: Int = model.tag
-  
+
   /**
    * Creates a copy of this PropertyDescriptor using new tag value
    */
   def retag(newTag: Int) = clone(model.copy(tag = newTag))
 
   /**
-   * Gets property value from given bean
+   * Gets property value from given bean.
+   *
+   * If metamodel of the property value contains conversions, this method returns converted (visible) value.
+   * This method is inefficient in cases when ContainerMetamodel has elementMetamodel with conversions. Better
+   * approach is to get underlying container and convert elements. 
+   * 
+   * For example, when Array[Int] has to be converted to Array[String] this method will
+   * perform actual conversion of underlying Array[Int] to visible Array[String].
+   * 
+   * Another side-effect of conversion is distortion of object references unless conversion functions are memos.
    *
    * @param obj bean object
    */
-  def get[A](obj: AnyRef): A = model.getter(obj).asInstanceOf[A]
+  def get[A](obj: AnyRef): A = {
+    val underlying = model.getter(obj)
+    metamodel.toVisible(underlying).asInstanceOf[A]
+  }
+
+  /**
+   * Returns bean property value without any conversions possibly present in property value metamodel.
+   */
+  def getUnderlying[A](obj: AnyRef): A = model.getter(obj).asInstanceOf[A]
 
   /**
    * Looks if property is annotated with given annotation class and returns the annotation instance if found.
@@ -82,17 +105,11 @@ trait PropertyDescriptor {
   /**
    * Type of the bean this property belongs to.
    */
-  def beanManifest: Manifest[_] = model.beanManifest
+  def beanType: ScalaType = model.beanType
 
-  //  def javaType: java.lang.reflect.Type
-  //
-  //  def javaGet(obj: AnyRef): AnyRef
-
-  override def toString = "%s : %s // tag: %d".format(name, scalaType.toString, tag)
+  override def toString = "%s : %s // tag: %d".format(name, metamodel.scalaType.toString, tag)
 
   private[scalabeans] val model: PropertyDescriptor.Model
-  private[scalabeans] def updateScalaType(newScalaType: => ScalaType) = clone(model.copy(scalaType = newScalaType))
-  private[scalabeans] def resetValueConvertor() = clone(model.copy(valueConvertor = PropertyDescriptor.ValueConvertorIdentity))
 
   protected[this] def clone(newModel: PropertyDescriptor.Model): ThisType
 }
@@ -114,7 +131,16 @@ trait MutablePropertyDescriptor extends DeserializablePropertyDescriptor {
 
   val mutable = true
 
-  def set(obj: AnyRef, value: Any): Unit = model.setter.get.apply(obj, value)
+  def setUnderlying(obj: AnyRef, value: Any): Unit = model.setter.get.apply(obj, value)
+
+  def set(obj: AnyRef, value: Any): Unit = {
+    metamodel match {
+      case cv: ConvertedMetamodel =>
+        setUnderlying(obj, cv.toUnderlying(value))
+      case _ =>
+        setUnderlying(obj, value)
+    }
+  }
 
   //  def javaSet(obj: AnyRef, value: AnyRef): Unit
 }
@@ -150,7 +176,7 @@ object PropertyDescriptor {
     }
   }
 
-  def unapply(pd: PropertyDescriptor) = Some((pd.name, pd.scalaType))
+  def unapply(pd: PropertyDescriptor) = Some(pd.name, pd.visibleType)
 
   protected def immutable(_model: Model) = {
     trait ClonableImpl {
@@ -214,42 +240,98 @@ object PropertyDescriptor {
     }
   }
 
-  private[scalabeans] val ValueConvertorIdentity = Converter.identity[Any]
   private[scalabeans] class Model(
-    val beanManifest: Manifest[_],
+    val beanType: ScalaType,
     val name: String,
-    _scalaType: => ScalaType,
+    _metamodel: => Metamodel,
+    _ctorArgMetamodel: => Metamodel,
     val tag: Int,
     val getter: (AnyRef => Any),
     val setter: Option[(AnyRef, Any) => Unit],
     val defaultValue: Option[() => Any] = None,
-    val findAnnotation: (Manifest[_] => Option[_]) = { _ => None},
-    val isInherited: Boolean = false,
-    val valueConvertor: Converter[Any, Any] = ValueConvertorIdentity) {
+    val findAnnotation: (Manifest[_] => Option[_]) = { _ => None },
+    val isInherited: Boolean = false) {
+
+    def this(
+      beanType: ScalaType,
+      name: String,
+      _metamodel: => Metamodel,
+      tag: Int,
+      getter: (AnyRef => Any),
+      setter: Option[(AnyRef, Any) => Unit],
+      defaultValue: Option[() => Any] = None,
+      findAnnotation: (Manifest[_] => Option[_]) = { _ => None },
+      isInherited: Boolean = false) = this(beanType,
+      name,
+      _metamodel,
+      _metamodel,
+      tag,
+      getter,
+      setter,
+      defaultValue,
+      findAnnotation,
+      isInherited)
+
     def copy(
       name: String = this.name,
-      scalaType: => ScalaType = _scalaType,
       tag: Int = this.tag,
       getter: (AnyRef => Any) = this.getter,
       setter: Option[(AnyRef, Any) => Unit] = this.setter,
-      defaultValue: Option[() => Any] = this.defaultValue,
-      valueConvertor: Converter[Any, Any] = this.valueConvertor) =
+      defaultValue: Option[() => Any] = this.defaultValue) =
       new Model(
-        this.beanManifest,
+        this.beanType,
         name,
-        scalaType,
+        _metamodel,
+        _ctorArgMetamodel,
         tag,
         getter,
         setter,
         defaultValue,
         this.findAnnotation,
-        this.isInherited,
-        valueConvertor)
-    lazy val scalaType = _scalaType
+        this.isInherited)
+    
+    lazy val metamodel = _metamodel
+    lazy val ctorArgMetamodel = {
+      val result = _ctorArgMetamodel
+      require(result.visibleMetamodel.scalaType == metamodel.visibleMetamodel.scalaType,
+          "Cannot calculate metamodel of constructor argument: " +
+          "calculated visible type %s doesn't match with visible property value type %s. " +
+          "This can be a result of previous metamodel rewrites.".
+          format(result.visibleMetamodel.scalaType, metamodel.visibleMetamodel.scalaType))
+      
+      result
+    }
+    
+    def rewriteMetamodel(rules: Rules[Metamodel]) = new Model(
+        this.beanType,
+        name,
+        metamodel rewrite rules,
+        ctorArgMetamodel rewrite rules,
+        tag,
+        getter,
+        setter,
+        defaultValue,
+        this.findAnnotation,
+        this.isInherited)
+    
+    def resetCtorArgMetamodel = new Model(
+        this.beanType,
+        name,
+        metamodel,
+        ctorArgMetamodel match {
+          case cv: ConvertedMetamodel => cv.visibleMetamodel
+          case _ => ctorArgMetamodel
+        },
+        tag,
+        getter,
+        setter,
+        defaultValue,
+        this.findAnnotation,
+        this.isInherited) 
   }
 
-  object Model {
-    def apply(_beanMF: Manifest[_], _tag: Int, field: Option[Field], getter: Option[Method], setter: Option[Method]): Model = {
+  private[scalabeans] object Model {
+    def apply(_beanType: ScalaType, _tag: Int, field: Option[Field], getter: Option[Method], setter: Option[Method]): Model = {
       val findAnnotation = { mf: Manifest[_] =>
         def findAnnotationHere(annotated: AnnotatedElement) = Option(annotated.getAnnotation(mf.erasure.asInstanceOf[Class[java.lang.annotation.Annotation]]))
 
@@ -261,34 +343,34 @@ object PropertyDescriptor {
       }
 
       val accessible = field orElse getter get
-      val isInherited = accessible.getDeclaringClass() != _beanMF.erasure
+      val isInherited = accessible.getDeclaringClass() != _beanType.erasure
 
       def immutableModelFromField(field: Field, typeHint: Option[ScalaType]) = new Model(
-        _beanMF,
+        _beanType,
         field.getName,
-        typeHint getOrElse scalaTypeOf(field.getGenericType),
+        metamodelOf(typeHint getOrElse scalaTypeOf(field.getGenericType)),
         _tag,
-        field.get,
+        field.get _,
         None,
         None,
         findAnnotation,
         isInherited)
 
       def mutableModelFromField(field: Field, typeHint: Option[ScalaType]) = new Model(
-        _beanMF,
+        _beanType,
         field.getName,
-        typeHint getOrElse scalaTypeOf(field.getGenericType),
+        metamodelOf(typeHint getOrElse scalaTypeOf(field.getGenericType)),
         _tag,
-        field.get,
-        Some(field.set),
+        field.get _,
+        Some(field.set _),
         None,
         findAnnotation,
         isInherited)
 
       def modelFromGetter(getter: Method, typeHint: Option[ScalaType]) = new Model(
-        _beanMF,
+        _beanType,
         getter.getName,
-        typeHint getOrElse scalaTypeOf(getter.getGenericReturnType),
+        metamodelOf(typeHint getOrElse scalaTypeOf(getter.getGenericReturnType)),
         _tag,
         getter.invoke(_),
         None,
@@ -297,9 +379,9 @@ object PropertyDescriptor {
         isInherited)
 
       def modelFromGetterSetter(getter: Method, setter: Method, typeHint: Option[ScalaType]) = new Model(
-        _beanMF,
+        _beanType,
         getter.getName,
-        typeHint getOrElse scalaTypeOf(getter.getGenericReturnType),
+        metamodelOf(typeHint getOrElse scalaTypeOf(getter.getGenericReturnType)),
         _tag,
         getter.invoke(_),
         Some({ (obj: AnyRef, value: Any) => setter.invoke(obj, value.asInstanceOf[AnyRef]) }),
@@ -307,7 +389,7 @@ object PropertyDescriptor {
         findAnnotation,
         isInherited)
 
-      val propertyTypeHint = scalaTypeOf(_beanMF) match {
+      val propertyTypeHint = _beanType match {
         //case tt: TupleType => Some(tt.arguments(_tag - 1))
         case _beanType @ _ =>
           for {

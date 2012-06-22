@@ -4,6 +4,7 @@ import org.junit.Test
 import org.junit.Assert._
 import Preamble._
 import org.scalastuff.scalabeans.types._
+import org.scalastuff.util.Converter
 
 class BeanDescriptorTest {
   import testbeans._
@@ -44,9 +45,9 @@ class BeanDescriptorTest {
 
   @Test
   def testRename() {
-    def testBD(name: String) = descriptorOf[PropertiesTestBean] rewrite propertyRules {
+    def testBD(name: String) = (descriptorOf[PropertiesTestBean] rewrite propertyRules {
       case p: PropertyDescriptor if p.name == name => p.rename("renamed")
-    }
+    }).asInstanceOf[BeanDescriptor]
 
     def checkImmutable(name: String, expected: String) {
       val bd = testBD(name)
@@ -119,12 +120,20 @@ class BeanDescriptorTest {
     check("immutableCP")
     check("mutableCP")
   }
+  
+  @Test
+  def testRemoveNotExistingProperty() {
+    descriptorOf[PropertiesTestBean].exclude("fjhjfdhjgkfdh")
+    // no exception expected
+  }
 
   @Test
   def testConvertPropertyType() {
-    def testBD(propertyName: String) = descriptorOf[PropertiesTestBean] rewrite propertyRules {
-      case p: PropertyDescriptor if p.name == propertyName => p.convertValue[String, Int](_.toInt, _.toString)
-    }
+    def testBD(propertyName: String) = (descriptorOf[PropertiesTestBean] rewrite propertyRules {
+      case p @ PropertyDescriptor(propertyName, StringType) => p.rewriteMetamodel(metamodelRules {
+        case mm @ Metamodel(StringType) => mm.convert(Converter[String, Int](_.toInt, _.toString))
+      })
+    }).asInstanceOf[BeanDescriptor]
 
     def checkImmutable(propertyName: String, expected: Int) {
       val bd = testBD(propertyName)
@@ -153,9 +162,9 @@ class BeanDescriptorTest {
 
   @Test
   def testConvertConstructorParameterType() {
-    val bd = descriptorOf[PropertiesTestBean] rewrite propertyRules {
-      case p @ PropertyDescriptor(_, StringType) => p.convertValue[String, Int](_.toInt, _.toString)
-    }
+    val bd = (descriptorOf[PropertiesTestBean] rewrite metamodelRules {
+      case mm @ Metamodel(StringType) => mm.convert(Converter[String, Int](_.toInt, _.toString))
+    }).asInstanceOf[BeanDescriptor]
 
     val bean = bd.newInstance(10, 20).asInstanceOf[PropertiesTestBean]
     assertEquals("10", bean.immutableCP)
@@ -175,13 +184,14 @@ class BeanDescriptorTest {
 
     val bdBefore = descriptorOf[PropertiesTestBean].
       withConstructor({ s1: String => new PropertiesTestBean(s1, "20") }, "immutableCP" -> None).
-      rewrite(propertyRules {
-        case p @ PropertyDescriptor(_, StringType) => p.convertValue[String, Int](_.toInt, _.toString)
-      })
+      rewrite(metamodelRules {
+        case mm @ Metamodel(StringType) => mm.convert(Converter[String, Int](_.toInt, _.toString))
+      }).asInstanceOf[BeanDescriptor]
 
-    val bdAfter = descriptorOf[PropertiesTestBean] rewrite propertyRules {
-      case p: PropertyDescriptor if p.scalaType == StringType => p.convertValue[String, Int](_.toInt, _.toString)
-    } withConstructor ({ i1: Int => new PropertiesTestBean(i1.toString(), "20") }, "immutableCP" -> None)
+    val bdAfter = (descriptorOf[PropertiesTestBean] rewrite metamodelRules {
+      case mm @ Metamodel(StringType) => mm.convert(Converter[String, Int](_.toInt, _.toString))
+    }).asInstanceOf[BeanDescriptor].
+    withConstructor ({ i1: Int => new PropertiesTestBean(i1.toString(), "20") }, "immutableCP" -> None)
 
     val bean1 = bdBefore.newInstance(10).asInstanceOf[PropertiesTestBean]
     check(bean1, bdBefore)
@@ -192,138 +202,155 @@ class BeanDescriptorTest {
 
   @Test
   def testDeepRewriteProperty() {
-    val bd = descriptorOf[DeepTestBean] rewrite propertyRules {
+    val bd = (descriptorOf[DeepTestBean] rewrite propertyRules {
       case p @ PropertyDescriptor("mutable", _) => p.rename("renamed")
-    }
+    }).asInstanceOf[BeanDescriptor]
 
     assertEquals(5, bd.properties.size)
     assertFalse(bd.propertyOption("renamed").isEmpty)
 
     //bd.properties foreach {p => println(p.toString)}
 
-    assertHasProperty(bd("list").scalaType.arguments(0), "renamed")
-    assertHasProperty(bd("beanArray").scalaType.arguments(0), "renamed")
-    assertHasProperty(bd("beanMapArray").scalaType.arguments(0).arguments(0).arguments(1), "renamed")
+    val bd1 = bd("list").metamodel.asInstanceOf[ContainerMetamodel[List]].elementMetamodel
+    val bd2 = bd("beanArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].elementMetamodel
+    //assertEquals(bd1, bd2)
+    
+    val bd3 = bd("beanMapArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].
+    	elementMetamodel.asInstanceOf[ContainerMetamodel[Traversable]].
+    	elementMetamodel.asInstanceOf[BeanDescriptor]("_2").metamodel
+    
+    assertHasProperty(bd1, "renamed")
+    assertHasProperty(bd2, "renamed")
+    assertHasProperty(bd3, "renamed")
 
-    val st1 = bd("list").scalaType.arguments(0)
-    val st2 = bd("beanArray").scalaType.arguments(0)
+    val st1 = bd("list").visibleType.arguments(0)
+    val st2 = bd("beanArray").visibleType.arguments(0)
     assertEquals(st1, st2)
 
-    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
-    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
-    assertEquals(bd1, bd2)
   }
 
   @Test
   def testDeepRewriteBean() {
-    val bd = descriptorOf[DeepTestBean] rewrite beanRules {
+    val bd = (descriptorOf[DeepTestBean] rewrite metamodelRules {
       case bd: BeanDescriptor => bd.exclude("mutable")
-    }
+    }).asInstanceOf[BeanDescriptor]
 
     assertEquals(4, bd.properties.size)
     assertEquals(None, bd.propertyOption("mutable"))
+    
+    val bd1 = bd("list").metamodel.asInstanceOf[ContainerMetamodel[List]].elementMetamodel
+    val bd2 = bd("beanArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].elementMetamodel
+    //assertEquals(bd1, bd2)
+    
+    val bd3 = bd("beanMapArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].
+    	elementMetamodel.asInstanceOf[ContainerMetamodel[Traversable]].
+    	elementMetamodel.asInstanceOf[BeanDescriptor]("_2").metamodel
 
-    assertHasNoProperty(bd("list").scalaType.arguments(0), "mutable")
-    assertHasNoProperty(bd("beanArray").scalaType.arguments(0), "mutable")
-    assertHasNoProperty(bd("beanMapArray").scalaType.arguments(0).arguments(0).arguments(1), "mutable")
+    assertHasNoProperty(bd1, "mutable")
+    assertHasNoProperty(bd2, "mutable")
+    assertHasNoProperty(bd3, "mutable")
 
-    val st1 = bd("list").scalaType.arguments(0)
-    val st2 = bd("beanArray").scalaType.arguments(0)
+    val st1 = bd("list").visibleType.arguments(0)
+    val st2 = bd("beanArray").visibleType.arguments(0)
     assertEquals(st1, st2)
-
-    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
-    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
-    assertEquals(bd1, bd2)
   }
 
   @Test
   def testCyclicBeanProperty {
-    val bd = descriptorOf[CyclicTestBean] rewrite propertyRules {
+    val bd = (descriptorOf[CyclicTestBean] rewrite propertyRules {
       case p @ PropertyDescriptor("cyclicRef", _) => p.rename("renamed")
-    }
+    }).asInstanceOf[BeanDescriptor]
 
     //bd.properties foreach {p => println(p.toString)}
 
-    def checkDeepCycle(beanType: ScalaType, counter: Int) {
+    def checkDeepCycle(metamodel: Metamodel, counter: Int) {
       if (counter > 0) {
-        assertHasProperty(beanType, "renamed")
-        val renamed = beanType.asInstanceOf[BeanType].beanDescriptor("renamed")
-        checkDeepCycle(renamed.scalaType, counter - 1)
+        assertHasProperty(metamodel, "renamed")
+        val renamed = metamodel.asInstanceOf[BeanDescriptor]("renamed")
+        checkDeepCycle(renamed.metamodel, counter - 1)
       }
     }
-    checkDeepCycle(BeanType(bd), 10)
-    checkDeepCycle(bd("renamed").scalaType, 10)
-    checkDeepCycle(bd("cyclicSet").scalaType.arguments(0), 10)
-    checkDeepCycle(bd("cyclicArray").scalaType.arguments(0), 10)
-    checkDeepCycle(bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0), 10)
+    checkDeepCycle(bd, 10)
+    checkDeepCycle(bd("renamed").metamodel, 10)
+    checkDeepCycle(bd("cyclicSet").metamodel.asInstanceOf[ContainerMetamodel[Set]].elementMetamodel, 10)
+    checkDeepCycle(bd("cyclicArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].elementMetamodel, 10)
+    checkDeepCycle(bd("cyclicMap").metamodel.asInstanceOf[ContainerMetamodel[Traversable]].
+        elementMetamodel.asInstanceOf[BeanDescriptor]("_2").
+        metamodel.asInstanceOf[ContainerMetamodel[List]].
+        elementMetamodel, 10)
 
-    val st1 = bd("renamed").scalaType
-    val st2 = bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0)
+    val st1 = bd("renamed").visibleType
+    val st2 = bd("cyclicMap").visibleType.arguments(0).arguments(1).arguments(0)
     assertEquals(st1, st2)
 
-    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
-    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
-    assertEquals(bd1, bd2)
+//    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
+//    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
+//    assertEquals(bd1, bd2)
   }
 
   @Test
   def testCyclicBean {
-    val bd = descriptorOf[CyclicTestBean] rewrite beanRules {
+    val bd = (descriptorOf[CyclicTestBean] rewrite metamodelRules {
       case bd: BeanDescriptor => bd.exclude("cyclicSet")
-    }
+    }).asInstanceOf[BeanDescriptor]
 
     //bd.properties foreach {p => println(p.toString)}
 
-    def checkDeepCycle(beanType: ScalaType, counter: Int) {
+    def checkDeepCycle(metamodel: Metamodel, counter: Int) {
       if (counter > 0) {
-        assertHasNoProperty(beanType, "cyclicSet")
-        val renamed = beanType.asInstanceOf[BeanType].beanDescriptor("cyclicRef")
-        checkDeepCycle(renamed.scalaType, counter - 1)
+        assertHasNoProperty(metamodel, "cyclicSet")
+        val renamed = metamodel.asInstanceOf[BeanDescriptor]("cyclicRef")
+        checkDeepCycle(renamed.metamodel, counter - 1)
       }
     }
-    checkDeepCycle(BeanType(bd), 10)
-    checkDeepCycle(bd("cyclicRef").scalaType, 10)
-    checkDeepCycle(bd("cyclicArray").scalaType.arguments(0), 10)
-    checkDeepCycle(bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0), 10)
+    
+    checkDeepCycle(bd, 10)
+    checkDeepCycle(bd("cyclicRef").metamodel, 10)
+    checkDeepCycle(bd("cyclicArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].elementMetamodel, 10)
+    checkDeepCycle(bd("cyclicMap").metamodel.asInstanceOf[ContainerMetamodel[Traversable]].
+        elementMetamodel.asInstanceOf[BeanDescriptor]("_2").
+        metamodel.asInstanceOf[ContainerMetamodel[List]].
+        elementMetamodel, 10)
 
-    val st1 = bd("cyclicRef").scalaType
-    val st2 = bd("cyclicMap").scalaType.arguments(0).arguments(1).arguments(0)
+    val st1 = bd("cyclicRef").visibleType
+    val st2 = bd("cyclicMap").visibleType.arguments(0).arguments(1).arguments(0)
     assertEquals(st1, st2)
 
-    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
-    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
-    assertEquals(bd1, bd2)
+//    val bd1 = st1.asInstanceOf[BeanType].beanDescriptor
+//    val bd2 = st2.asInstanceOf[BeanType].beanDescriptor
+//    assertEquals(bd1, bd2)
   }
 
   @Test
   def testScalaTypeRewrite {
     val rules = propertyRules {
       case p @ PropertyDescriptor(_, t) if t.erasure == classOf[java.util.UUID] =>
-        p/*.convertValue(
+        p /*.convertValue(
           { uuid: java.util.UUID => (uuid.getMostSignificantBits(), uuid.getLeastSignificantBits()) },
           { bits: (Long, Long) => new java.util.UUID(bits._1, bits._2) })*/
     }
 
-    val scalaType = scalaTypeOf[ObjectGraph] rewrite rules
+    val scalaType = descriptorOf[ObjectGraph] rewrite rules
   }
 
-  private def assertHasProperty(beanType: ScalaType, propertyName: String) {
-    beanType match {
-      case BeanType(bd) =>
+  private def assertHasProperty(metamodel: Metamodel, propertyName: String) {
+    metamodel match {
+      case bd: BeanDescriptor =>
         //bd.properties foreach {p => println(p.toString)}
         assertFalse(bd.propertyOption(propertyName).isEmpty)
-      case _ => fail("BeanType expected, %s found".format(beanType))
+      case _ => fail("BeanDescriptor expected, %s found".format(metamodel))
     }
   }
 
-  private def assertHasNoProperty(beanType: ScalaType, propertyName: String) {
-    beanType match {
-      case BeanType(bd) =>
+  private def assertHasNoProperty(metamodel: Metamodel, propertyName: String) {
+    metamodel match {
+      case bd: BeanDescriptor =>
         //bd.properties foreach {p => println(p.toString)}
         assertTrue(bd.propertyOption("mutable").isEmpty)
-      case _ => fail("BeanType expected, %s found".format(beanType))
+      case _ => fail("BeanDescriptor expected, %s found".format(metamodel))
     }
   }
+  
 }
 
 package testbeans {

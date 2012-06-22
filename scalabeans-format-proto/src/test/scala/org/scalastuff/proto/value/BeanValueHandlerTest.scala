@@ -26,13 +26,13 @@ class BeanValueHandlerTest {
   @Test
   def testImmutable {
     val bd = descriptorOf[Tuple2[String, Int]]
-    val vh = BeanValueHandler(scalaTypeOf[Tuple2[String, Int]])
+    val vh = BeanValueHandler(metamodelOf[Tuple2[String, Int]].asInstanceOf[BeanDescriptor])
 
     Assert.assertEquals(2, bd.properties.size)
     val p1 = bd.properties(0)
     Assert.assertTrue(p1.isInstanceOf[ImmutablePropertyDescriptor])
     Assert.assertTrue(p1.isInstanceOf[ConstructorParameter])
-    Assert.assertEquals(StringType, p1.scalaType)
+    Assert.assertEquals(StringType, p1.visibleType)
 
     Assert.assertTrue(bd.needsBeanBuilder)
     Assert.assertTrue(vh.isInstanceOf[ImmutableBeanValueHandler])

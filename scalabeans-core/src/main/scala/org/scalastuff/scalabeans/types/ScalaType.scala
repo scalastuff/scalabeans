@@ -73,28 +73,9 @@ object AnyRefType {
   def unapply(t: AnyRefType) = true
 }
 
-trait BeanType extends AnyRefType {
-  lazy val beanDescriptor = Preamble.descriptorOf(this)
-
-  def copy(_beanDescriptor: => BeanDescriptor) =
-    new Impl(erasure, arguments: _*) with BeanType {
-      override lazy val beanDescriptor = _beanDescriptor
-    }
-
-  override def equals(other: Any) = other match {
-    case other: BeanType =>
-      super.equals(other) && beanDescriptor == other.beanDescriptor
-    case _ => false
-  }
-}
-
+trait BeanType extends AnyRefType 
 object BeanType {
-  def apply(_beanDescriptor: BeanDescriptor): BeanType =
-    new Impl(_beanDescriptor.manifest.erasure, _beanDescriptor.manifest.typeArguments.map(ScalaType.scalaTypeOf(_)): _*) with BeanType {
-      override lazy val beanDescriptor = _beanDescriptor
-    }
-
-  def unapply(t: BeanType) = Some(t.beanDescriptor)
+  def unapply(t: BeanType) = true
 }
 
 trait OptionType extends AnyRefType with SingleArgument
@@ -194,6 +175,7 @@ trait ArrayType extends AnyRefType with SingleArgument {
 }
 
 object ArrayType {
+  def apply(arg: ScalaType) = new Impl(ManifestFactory.manifestOf(arg).arrayManifest.erasure, arg) with ArrayType
   def unapply(t: ArrayType) = Some(t.argument)
 }
 
@@ -506,7 +488,7 @@ object ScalaType {
     else if (classOf[scala.Tuple1[_]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with TupleType
     else if (classOf[scala.Tuple2[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0), arg(1)) with TupleType
     else if (classOf[java.lang.Enum[_]].isAssignableFrom(erasure)) new Impl(classOf[java.lang.Enum[_]], new Impl(erasure) with AnyRefType) with JavaEnumType
-    else if (erasure.isArray) new Impl(erasure, arg(0)) with ArrayType
+    else if (erasure.isArray) ArrayType(arg(0))
     else if (classOf[scala.collection.mutable.LinkedHashMap[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with LinkedHashMapType
     else if (classOf[scala.collection.immutable.HashMap[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with ImmutableHashMapType
     else if (classOf[scala.collection.mutable.HashMap[_, _]].isAssignableFrom(erasure)) new Impl(erasure, arg(0)) with MutableHashMapType

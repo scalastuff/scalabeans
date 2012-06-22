@@ -120,11 +120,8 @@ package mutabletestbeans {
     }
   }
 
-  case class JavaEnumTestBean {
-    import java.lang.annotation.RetentionPolicy
-
-    var e: RetentionPolicy = RetentionPolicy.CLASS
-
+  import java.lang.annotation.RetentionPolicy
+  case class JavaEnumTestBean(var e: RetentionPolicy = RetentionPolicy.CLASS) {    
     def set1() = {
       e = RetentionPolicy.RUNTIME
       this
@@ -182,8 +179,8 @@ package mutabletestbeans {
           i == other.i &&
           l == other.l &&
           bool == other.bool &&
-          Math.abs(f - other.f) < 0.1 &&
-          Math.abs(d - other.d) < 0.1 &&
+          math.abs(f - other.f) < 0.1 &&
+          math.abs(d - other.d) < 0.1 &&
           c == other.c &&
           str == other.str &&
           bd == other.bd &&
@@ -210,6 +207,8 @@ package mutabletestbeans {
       case other : DefaultValueGeneratorTestBean => this.id == other.id
       case _ => false
     }
+    
+    override def toString() = "DefaultValueGeneratorTestBean(%s)".format(id)
   }
 
   case class CompositeTestBean(

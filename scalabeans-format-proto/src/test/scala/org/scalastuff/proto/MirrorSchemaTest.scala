@@ -66,7 +66,7 @@ class MirrorSchemaTest {
   }
 }
 
-case class EmptyTestBean
+case class EmptyTestBean()
 
 class PrimitiveTypesBean extends TestBean[PrimitiveTypesBean] {
   var bt: Byte = _

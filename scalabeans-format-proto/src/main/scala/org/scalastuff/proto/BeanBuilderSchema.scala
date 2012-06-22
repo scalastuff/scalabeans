@@ -62,7 +62,7 @@ abstract class PropertyBuilderField(tag: Int, propertyDescriptor: PropertyDescri
 
 object PropertyBuilderField {
   def apply(tag: Int, prop: PropertyDescriptor) =
-      for (valueHandler <- ValueHandler(prop.scalaType))
+      for (valueHandler <- ValueHandler(prop.metamodel))
       yield {
         valueHandler match {
           case repeatedValueHandler: RepeatedValueHandler =>

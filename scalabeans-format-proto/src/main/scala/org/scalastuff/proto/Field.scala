@@ -51,7 +51,7 @@ abstract class Field[B <: AnyRef](val tag: Int, propertyDescriptor: PropertyDesc
 
 object Field {
   def apply[B <: AnyRef](tag: Int, prop: PropertyDescriptor) =
-      for (vh <- ValueHandler(prop.scalaType))
+      for (vh <- ValueHandler(prop.metamodel))
       yield new Field[B](tag, prop) {
               val valueHandler = vh
               protected def getValue(message: B) = prop.get[valueHandler.V](message)

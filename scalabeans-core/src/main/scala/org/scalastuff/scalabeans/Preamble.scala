@@ -20,14 +20,20 @@ import java.lang.reflect.Type
 
 import org.scalastuff.scalabeans.types.ScalaType
 
-object Preamble extends Rewritables {
+object Preamble extends MetamodelRules with Metamodels {
+  def metamodelOf[T : Manifest] = Metamodel[T]()
+
+  def metamodelOf(scalaType: ScalaType) = Metamodel(scalaType)
+  
   def descriptorOf[T <: AnyRef](implicit mf: Manifest[T]) = BeanDescriptor[T](mf)
 
-  def descriptorOf(beanType: ScalaType) = BeanDescriptor[AnyRef](beanType)
+  def descriptorOf(beanType: ScalaType) = BeanDescriptor(beanType)
   
-  def descriptorOf(t: Type) = BeanDescriptor[AnyRef](scalaTypeOf(t))
+  def descriptorOf(t: Type) = BeanDescriptor(scalaTypeOf(t))
   
   def scalaTypeOf[T](implicit mf: Manifest[T]) = ScalaType.scalaTypeOf(mf)
 
   def scalaTypeOf[T](t : Type) = ScalaType.scalaTypeOf(ManifestFactory.manifestOf(t))
+  
+  
 }

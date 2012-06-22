@@ -4,7 +4,7 @@
 	<parent>
 		<artifactId>scalabeans</artifactId>
 		<groupId>org.scalastuff</groupId>
-		<version>0.3-SNAPSHOT</version>
+		<version>0.9-SNAPSHOT</version>
 		<relativePath>..</relativePath>
 	</parent>
 	<artifactId>scalabeans-convertor-tests</artifactId>
@@ -18,12 +18,12 @@
 		<dependency>
 			<groupId>org.scalatest</groupId>
 			<artifactId>scalatest_2.9.0</artifactId>
-			<scope>test</scope>
+			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
-			<scope>test</scope>
+			<scope>compile</scope>
 		</dependency>
 	</dependencies>
 </project>

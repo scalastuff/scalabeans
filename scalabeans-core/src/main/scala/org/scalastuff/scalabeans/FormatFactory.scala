@@ -1,8 +1,9 @@
 package org.scalastuff.scalabeans
 
-import org.scalastuff.scalabeans.Preamble.scalaTypeOf
+import org.scalastuff.scalabeans.Preamble._
 import org.scalastuff.scalabeans.types.ScalaType
 import org.scalastuff.util.Format
+import org.scalastuff.util.Rules
 
 /**
  * Provides interface for creation of Format[A] objects for specific ScalaType.
@@ -16,9 +17,9 @@ trait FormatFactory {
   type This <: FormatFactory
   type F[A] <: Format[A] 
   
-  def withRewriteRules(scalaTypeRules: Rules[ScalaType]): This
+  def withRewriteRules(rules: Rules[Metamodel]): This
   
-  def formatFor[A <: AnyRef : Manifest](): F[A] = formatFor[A](scalaTypeOf[A])
+  def formatFor[A <: AnyRef : Manifest](): F[A] = formatFor[A](metamodelOf[A])
   
-  protected def formatFor[A <: AnyRef : Manifest](scalaType: ScalaType): F[A]
+  protected def formatFor[A <: AnyRef : Manifest](metamodel: Metamodel): F[A]
 }

@@ -57,7 +57,10 @@ abstract class BeanBuilder {
   private[this] val mutablePropertyValues = Array.ofDim[Any](lastMutablePropertyIndex + 1)
   protected val unsetMutableProperties: Array[Boolean]
 
-  def unsetProperties(): List[DeserializablePropertyDescriptor] = {
+  /**
+   * Returns list of properties not set by `set(..)` method.
+   */
+  def notSetProperties(): List[DeserializablePropertyDescriptor] = {
     (constructorParams filter { prop => unsetConstructorParams.contains(prop.index) }) :::
       (mutableProperties filter { prop => unsetMutableProperties.contains(prop.index) })
   }
@@ -79,7 +82,7 @@ abstract class BeanBuilder {
    */
   def set(property: PropertyDescriptor, value: Any): Unit = property match {
     case cp: ConstructorParameter =>
-      constructorParamValues(cp.index) = property.model.valueConvertor.from(value).asInstanceOf[AnyRef]
+      constructorParamValues(cp.index) = property.model.ctorArgMetamodel.converter.from(value).asInstanceOf[AnyRef]
       unsetConstructorParams(cp.index) = false
     case mp: MutablePropertyDescriptor =>
       mutablePropertyValues(mp.index) = value
@@ -88,9 +91,9 @@ abstract class BeanBuilder {
   }
 
   def get[A](property: PropertyDescriptor): A = property match {
-    case cp: ConstructorParameter => property.model.valueConvertor.to(constructorParamValues(cp.index)).asInstanceOf[A]
+    case cp: ConstructorParameter => property.model.ctorArgMetamodel.converter.to(constructorParamValues(cp.index)).asInstanceOf[A]
     case mp: MutablePropertyDescriptor => mutablePropertyValues(mp.index).asInstanceOf[A]
-    case _ => error("Cannot get property value: only constructor parameters and mutable properties are accepted")
+    case _ => sys.error("Cannot get property value: only constructor parameters and mutable properties are accepted")
   }
 
   /**
@@ -107,7 +110,7 @@ abstract class BeanBuilder {
           if param.defaultValue.isEmpty
         } yield param.name
 
-      error("Cannot instantiate object of class %s : missing constructor parameters %s".
+      sys.error("Cannot instantiate object of class %s : missing constructor parameters %s".
         format(beanDescriptor.toString, missingParameterNames mkString ", "))
     }
 
@@ -132,7 +135,7 @@ abstract class BeanBuilder {
   }
 }
 
-class BeanBuilderFactory(val beanDescriptor: BeanDescriptor, properties: List[PropertyDescriptor]) {
+class BeanBuilderFactory(val beanDescriptor: BeanDescriptor) {
   private[scalabeans] val constructor = beanDescriptor.constructor.getOrElse {
     throw new IllegalArgumentException(
       "Cannot create BeanBuilderFactory for %s: it has no constructors (either abstract class or interface)".
@@ -163,9 +166,9 @@ class BeanBuilderFactory(val beanDescriptor: BeanDescriptor, properties: List[Pr
 
   private val unsetConstructorParams = ArrayBuffer.fill[Boolean](constructorParams.size)(true) toArray
 
-  val mutableProperties = properties collect {
+  val mutableProperties = beanDescriptor.properties collect {
     case mp: MutablePropertyDescriptor if !mp.isInstanceOf[ConstructorParameter] => mp
-  }
+  } toList
 
   val lastMutablePropertyIndex = mutableProperties.foldLeft(-1)(_ max _.index)
   private val unsetMutableProperties = Array.ofDim[Boolean](lastMutablePropertyIndex + 1)

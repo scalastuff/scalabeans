@@ -2,7 +2,6 @@ package org.scalastuff.scalabeans
 
 import org.scalatest.FlatSpec
 import org.scalatest.matchers.ShouldMatchers
-import org.scalastuff.scalabeans.Enum
 import java.util.UUID
 import scala.util.Random
 
@@ -51,7 +50,7 @@ trait ImmutableBeanTypesMonoBehaviours extends MonoBehaviours with ShouldMatcher
 }
 
 package immutabletestbeans {
-  case class EmptyTestBean
+  case class EmptyTestBean()
 
   case class PrimitiveTypesBean(
     bt: Byte = 0,
@@ -72,8 +71,8 @@ package immutabletestbeans {
           i == other.i &&
           l == other.l &&
           bool == other.bool &&
-          Math.abs(f - other.f) < 0.1 &&
-          Math.abs(d - other.d) < 0.1 &&
+          math.abs(f - other.f) < 0.1 &&
+          math.abs(d - other.d) < 0.1 &&
           c == other.c
       case _ => false
     }
@@ -142,8 +141,8 @@ package immutabletestbeans {
           i == other.i &&
           l == other.l &&
           bool == other.bool &&
-          Math.abs(f - other.f) < 0.1 &&
-          Math.abs(d - other.d) < 0.1 &&
+          math.abs(f - other.f) < 0.1 &&
+          math.abs(d - other.d) < 0.1 &&
           c == other.c &&
           str == other.str &&
           bd == other.bd &&

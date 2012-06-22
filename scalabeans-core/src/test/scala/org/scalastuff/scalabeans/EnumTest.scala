@@ -64,7 +64,7 @@ class EnumTest {
   def testEnumType {
     val bd = descriptorOf[EnumTestBean]
     val pd = bd("color")
-    pd.scalaType match {
+    pd.metamodel.scalaType match {
     	case EnumType(enum) => 
     		println("Enum: " + enum)
     		assertEquals(Color, enum)

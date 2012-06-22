@@ -47,7 +47,7 @@ class BeanIntrospectorTest {
     assertEquals(1, bd.properties.size)
     assertNotNull(bd("i"))
     assertTrue(bd("i").isInstanceOf[ConstructorParameter])
-    assertEquals(scalaTypeOf[Seq[Int]], bd("i").scalaType)
+    assertEquals(scalaTypeOf[Seq[Int]], bd("i").metamodel.scalaType)
   }
 }
 

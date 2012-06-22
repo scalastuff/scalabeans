@@ -1,18 +1,19 @@
 package org.scalastuff.scalabeans.format.proto
-import org.scalastuff.util.Format
-import org.scalastuff.proto.value.BeanValueHandler
-import com.dyuproject.protostuff.ByteArrayInput
+
 import java.io.InputStream
+import java.io.OutputStream
+import org.scalastuff.proto.value.BeanValueHandler
+import org.scalastuff.scalabeans.Preamble._
+import org.scalastuff.scalabeans.types.ScalaType
+import org.scalastuff.scalabeans.types.TupleType
+import org.scalastuff.util.Format
+import com.dyuproject.protostuff.Schema
+import com.dyuproject.protostuff.ByteArrayInput
 import com.dyuproject.protostuff.CodedInput
 import com.dyuproject.protostuff.GraphByteArrayInput
 import com.dyuproject.protostuff.GraphCodedInput
-import java.io.OutputStream
-import com.dyuproject.protostuff.Schema
 import com.dyuproject.protostuff.GraphIOUtil
-import org.scalastuff.scalabeans.types.ScalaType
-import org.scalastuff.scalabeans.types.TupleType
-import com.dyuproject.protostuff.ProtostuffOutput
-import com.dyuproject.protostuff.GraphProtostuffOutput
+import org.scalastuff.scalabeans.Metamodel
 
 class GraphProtostuffFormat[T] private[proto](beanValueHandler: BeanValueHandler) extends Format[T] {
   
@@ -41,7 +42,7 @@ class GraphProtostuffFormat[T] private[proto](beanValueHandler: BeanValueHandler
   private val writeSchema = beanValueHandler.writeSchema.asInstanceOf[Schema[T]]
 }
 
-class WrappedGraphProtostuffFormat[T] private[proto](scalaType: ScalaType) extends Format[T] {
+class WrappedGraphProtostuffFormat[T] private[proto](metamodel: Metamodel) extends Format[T] {
   def readFrom(buffer: Array[Byte]): T = wrappedFormat.readFrom(buffer)._1
   
   def readFrom(inputStream: InputStream): T = wrappedFormat.readFrom(inputStream)._1
@@ -50,8 +51,8 @@ class WrappedGraphProtostuffFormat[T] private[proto](scalaType: ScalaType) exten
   
   def toByteArray(bean: T): Array[Byte] = wrappedFormat.toByteArray(Tuple1(bean))
   
-  val wrappedSchema = BeanValueHandler(TupleType(scalaType)).writeSchema.asInstanceOf[Schema[Tuple1[T]]]
+  val wrappedSchema = BeanValueHandler(TupleBeanDescriptor(metamodel)).writeSchema.asInstanceOf[Schema[Tuple1[T]]]
   
-  private val wrappedValueHandler = BeanValueHandler(TupleType(scalaType))
+  private val wrappedValueHandler = BeanValueHandler(TupleBeanDescriptor(metamodel))
   private val wrappedFormat = new GraphProtostuffFormat[Tuple1[T]](wrappedValueHandler)
 }
