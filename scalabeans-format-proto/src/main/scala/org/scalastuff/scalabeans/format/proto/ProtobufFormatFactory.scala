@@ -14,7 +14,7 @@ object ProtobufFormatFactory {
   def apply(rules: Rules[Metamodel] = EmptyMetamodelRules) = new ProtobufFormatFactory(rules)
 }
 
-class ProtobufFormatFactory private(rules: Rules[Metamodel] = EmptyMetamodelRules) extends FormatFactory {
+class ProtobufFormatFactory private(rules: Rules[Metamodel]) extends FormatFactory {
   type This = ProtobufFormatFactory
   type F[A] = Format[A]
 

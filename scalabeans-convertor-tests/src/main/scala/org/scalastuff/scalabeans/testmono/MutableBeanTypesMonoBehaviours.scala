@@ -164,8 +164,8 @@ package mutabletestbeans {
       bi = 0
 
       timestamp = new java.util.Date(0)
-      dateTime = new java.sql.Timestamp(0)
-      date = new java.sql.Date(0)
+      dateTime = java.sql.Timestamp.valueOf("1970-01-01 00:00:00.0")
+      date = java.sql.Date.valueOf("1970-01-01")
 
       op = None
       or1 = None

@@ -252,7 +252,7 @@ object ValueHandler {
 
           def readFrom(input: Input) = {
             val ordinal = input.readInt32()
-            enum.valueOf(ordinal) getOrElse error("Cannot read enum value of %s: unknown ordinal %d".format(enum.toString, ordinal))
+            enum.valueOf(ordinal) getOrElse sys.error("Cannot read enum value of %s: unknown ordinal %d".format(enum.toString, ordinal))
           }
 
           def writeValueTo(tag: Int, output: Output, value: V, repeated: Boolean) = {
@@ -264,15 +264,12 @@ object ValueHandler {
           }
         })
 
-        case JavaEnumType(enum) => Some(new ValueHandler {
+        case JavaEnumType(values) => Some(new ValueHandler {
           type V = AnyRef
 
           override def isDefaultValue(v: V) = false
 
-          val defaultValue: V = {
-            val constants = enum.erasure.getEnumConstants
-            if (constants.size > 0) constants(0) else null
-          }
+          val defaultValue: V = values.headOption getOrElse null
 
           def transfer(tag: Int, pipe: Pipe, input: Input, output: Output, repeated: Boolean) {
             output.writeInt32(tag, input.readInt32, repeated)
@@ -281,23 +278,21 @@ object ValueHandler {
           def writeValueTo(tag: Int, output: Output, value: V, repeated: Boolean) {
             output.writeInt32(tag, value.asInstanceOf[Enum[_]].ordinal, repeated)
           }
-
+          
+            
           def readFrom(input: Input) = {
-            val constants = enum.erasure.getEnumConstants.asInstanceOf[Array[Enum[_]]]
             val ordinal = input.readInt32()
 
-            val properConstant = for {
-              constant <- constants
-              if constant.asInstanceOf[Enum[_]].ordinal == ordinal
-            } yield constant
-            properConstant.headOption getOrElse sys.error("Cannot read enum value of %s: unknown ordinal %d".format(enum.toString, ordinal))
+            values.find(_.ordinal() == ordinal) getOrElse {
+              sys.error("Cannot read enum value of %s: unknown ordinal %d".format(scalaType, ordinal))
+            }
           }
         })
 
         case _ => None
       }
 
-    case cm: ContainerMetamodel[_] =>
+    case cm: ContainerMetamodel =>
       cm.scalaType match {
         case at @ ArrayType(_) =>
           for (valueHandler <- ValueHandler(cm.elementMetamodel))

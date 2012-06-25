@@ -160,11 +160,12 @@ object EnumType {
 }
 
 trait JavaEnumType extends AnyRefType with SingleArgument {
+  val values = argument.erasure.getEnumConstants.asInstanceOf[Array[java.lang.Enum[_]]].toSeq
   override def toString = "JavaEnum[" + argument.toString + "]"
 }
 
 object JavaEnumType {
-  def unapply(t: JavaEnumType) = Some(t.argument)
+  def unapply(t: JavaEnumType) = Some(t.values)
 }
 
 // ******* Arrays ******

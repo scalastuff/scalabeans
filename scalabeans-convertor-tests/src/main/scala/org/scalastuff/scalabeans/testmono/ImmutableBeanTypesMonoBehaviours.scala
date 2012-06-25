@@ -130,8 +130,10 @@ package immutabletestbeans {
     or1: Option[String] = Some("11"),
     or2: Option[String] = Some("12")) {
 
-    def set1() = DefaultValuesTestBean(0, 0, 0, 0, false, 0f, 0.0, 0, "", 0, 0, 
-        new java.util.Date(0), new java.sql.Timestamp(0), new java.sql.Date(0), None, None, Some(""))
+    def set1() = DefaultValuesTestBean(0, 0, 0, 0, false, 0f, 0.0, 'B', "", 0, 0, 
+        new java.util.Date(0), 
+        java.sql.Timestamp.valueOf("1970-01-01 00:00:00.0"), 
+        java.sql.Date.valueOf("1970-01-01"), None, None, Some(""))
 
     override def equals(obj: Any) = obj match {
       case other: DefaultValuesTestBean =>

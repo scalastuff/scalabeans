@@ -211,12 +211,12 @@ class BeanDescriptorTest {
 
     //bd.properties foreach {p => println(p.toString)}
 
-    val bd1 = bd("list").metamodel.asInstanceOf[ContainerMetamodel[List]].elementMetamodel
-    val bd2 = bd("beanArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].elementMetamodel
+    val bd1 = bd("list").metamodel.asInstanceOf[ContainerMetamodel].elementMetamodel
+    val bd2 = bd("beanArray").metamodel.asInstanceOf[ContainerMetamodel].elementMetamodel
     //assertEquals(bd1, bd2)
     
-    val bd3 = bd("beanMapArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].
-    	elementMetamodel.asInstanceOf[ContainerMetamodel[Traversable]].
+    val bd3 = bd("beanMapArray").metamodel.asInstanceOf[ContainerMetamodel].
+    	elementMetamodel.asInstanceOf[ContainerMetamodel].
     	elementMetamodel.asInstanceOf[BeanDescriptor]("_2").metamodel
     
     assertHasProperty(bd1, "renamed")
@@ -238,12 +238,12 @@ class BeanDescriptorTest {
     assertEquals(4, bd.properties.size)
     assertEquals(None, bd.propertyOption("mutable"))
     
-    val bd1 = bd("list").metamodel.asInstanceOf[ContainerMetamodel[List]].elementMetamodel
-    val bd2 = bd("beanArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].elementMetamodel
+    val bd1 = bd("list").metamodel.asInstanceOf[ContainerMetamodel].elementMetamodel
+    val bd2 = bd("beanArray").metamodel.asInstanceOf[ContainerMetamodel].elementMetamodel
     //assertEquals(bd1, bd2)
     
-    val bd3 = bd("beanMapArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].
-    	elementMetamodel.asInstanceOf[ContainerMetamodel[Traversable]].
+    val bd3 = bd("beanMapArray").metamodel.asInstanceOf[ContainerMetamodel].
+    	elementMetamodel.asInstanceOf[ContainerMetamodel].
     	elementMetamodel.asInstanceOf[BeanDescriptor]("_2").metamodel
 
     assertHasNoProperty(bd1, "mutable")
@@ -272,11 +272,11 @@ class BeanDescriptorTest {
     }
     checkDeepCycle(bd, 10)
     checkDeepCycle(bd("renamed").metamodel, 10)
-    checkDeepCycle(bd("cyclicSet").metamodel.asInstanceOf[ContainerMetamodel[Set]].elementMetamodel, 10)
-    checkDeepCycle(bd("cyclicArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].elementMetamodel, 10)
-    checkDeepCycle(bd("cyclicMap").metamodel.asInstanceOf[ContainerMetamodel[Traversable]].
+    checkDeepCycle(bd("cyclicSet").metamodel.asInstanceOf[ContainerMetamodel].elementMetamodel, 10)
+    checkDeepCycle(bd("cyclicArray").metamodel.asInstanceOf[ContainerMetamodel].elementMetamodel, 10)
+    checkDeepCycle(bd("cyclicMap").metamodel.asInstanceOf[ContainerMetamodel].
         elementMetamodel.asInstanceOf[BeanDescriptor]("_2").
-        metamodel.asInstanceOf[ContainerMetamodel[List]].
+        metamodel.asInstanceOf[ContainerMetamodel].
         elementMetamodel, 10)
 
     val st1 = bd("renamed").visibleType
@@ -306,10 +306,10 @@ class BeanDescriptorTest {
     
     checkDeepCycle(bd, 10)
     checkDeepCycle(bd("cyclicRef").metamodel, 10)
-    checkDeepCycle(bd("cyclicArray").metamodel.asInstanceOf[ContainerMetamodel[Array]].elementMetamodel, 10)
-    checkDeepCycle(bd("cyclicMap").metamodel.asInstanceOf[ContainerMetamodel[Traversable]].
+    checkDeepCycle(bd("cyclicArray").metamodel.asInstanceOf[ContainerMetamodel].elementMetamodel, 10)
+    checkDeepCycle(bd("cyclicMap").metamodel.asInstanceOf[ContainerMetamodel].
         elementMetamodel.asInstanceOf[BeanDescriptor]("_2").
-        metamodel.asInstanceOf[ContainerMetamodel[List]].
+        metamodel.asInstanceOf[ContainerMetamodel].
         elementMetamodel, 10)
 
     val st1 = bd("cyclicRef").visibleType

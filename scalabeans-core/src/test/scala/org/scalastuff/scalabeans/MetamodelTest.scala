@@ -67,7 +67,7 @@ class MetamodelTest extends FlatSpec with ShouldMatchers {
     testMetamodel.isInstanceOf[ConvertedMetamodel] should be(true)
     val cv = testMetamodel.asInstanceOf[ConvertedMetamodel]
     cv.visibleMetamodel.scalaType should be(OptionType(IntType))
-    cv.visibleMetamodel.isInstanceOf[ContainerMetamodel[Option]] should be(true)
+    cv.visibleMetamodel.isInstanceOf[ContainerMetamodel] should be(true)
   }
 
   "ValueMetamodel inside container converted to ContainerMetamodel" should "be rewritable" in {

@@ -4,9 +4,9 @@ import scala.reflect.ScalaSignature
 import org.scalastuff.scalabeans.types._
 import org.scalastuff.util.Converter
 import Preamble._
-import org.scalastuff.util.Functors
-import org.scalastuff.util.Functor
 import org.scalastuff.util.Rules
+import scala.collection.mutable.Builder
+import org.scalastuff.util.{Functor, ForEach}
 
 /**
  *  Represents information about 2 models: underlying and visible.
@@ -129,10 +129,13 @@ class ConvertedValueMetamodel private[scalabeans] (
  *
  * N.B. Metamodel of Tuple1 is a BeanDescriptor
  */
-trait ContainerMetamodel[M[_]] extends Metamodel { self =>
+trait ContainerMetamodel extends Metamodel { self =>
 
+  type M[A]
+  
   def elementMetamodel: Metamodel
-  implicit val functor: Functor[M]
+  implicit def functor: Functor[M]
+  implicit def forEach: ForEach[M]
     
   require(scalaType.arguments.size == 1,
     "ScalaType of container must have only 1 argument (type parameter)")
@@ -146,17 +149,32 @@ trait ContainerMetamodel[M[_]] extends Metamodel { self =>
     case mm @ _ =>
       new ContainerMetamodelImpl[M](scalaType, mm)
   }
+  
+  private lazy val newBuilderF: () => Builder[Any, M[Any]] = {
+    scalaType match {
+      case at @ ArrayType(_) => Some({ () => at.newArrayBuilder[Any]().asInstanceOf[Builder[Any, M[Any]]]})
+      case coll @ CollectionType(_) => coll.newBuilder.asInstanceOf[Option[() => Builder[Any, M[Any]]]]
+      case _ => None
+    }
+  } getOrElse {
+    sys.error("No builder is found for type " + scalaType)
+  }
+  
+  def newBuilder() = newBuilderF()
 
   override def toString() = "ContainerMetamodel(%s, %s)".format(scalaType, elementMetamodel)
 }
 
-class ContainerMetamodelImpl[M[_]](
+class ContainerMetamodelImpl[MM[_]](
   val scalaType: ScalaType,
-  val elementMetamodel: Metamodel)(implicit val functor: Functor[M]) 
-  extends NotConvertedMetamodel with ContainerMetamodel[M]
+  val elementMetamodel: Metamodel)(implicit val functor: Functor[MM], val forEach: ForEach[MM]) 
+  extends NotConvertedMetamodel with ContainerMetamodel {
+  
+  type M[A] = MM[A]
+}
 
 object ContainerMetamodel {
-  def unapply[M[_]](cm: ContainerMetamodel[M]) = Some(cm.elementMetamodel)
+  def unapply(cm: ContainerMetamodel) = Some(cm.elementMetamodel)
 }
 
 /**
@@ -167,11 +185,13 @@ object ContainerMetamodel {
  *  or as underlying container with converted values. Second option will in general be more
  *  efficient.
  */
-class ContainerMetamodelWithConvertedElement[M[_]](
+class ContainerMetamodelWithConvertedElement[MM[_]](
   val scalaType: ScalaType,
-  val elementMetamodel: ConvertedMetamodel)(implicit val functor: Functor[M])
-  extends ConvertedMetamodel with ContainerMetamodel[M]{
+  val elementMetamodel: ConvertedMetamodel)(implicit val functor: Functor[MM], val forEach: ForEach[MM])
+  extends ConvertedMetamodel with ContainerMetamodel {
 
+  type M[A] = MM[A]
+  
   /**
    * Provides conversion of the container to/from visible type using fmap and element converter.
    */
@@ -185,8 +205,9 @@ class ContainerMetamodelWithConvertedElement[M[_]](
 
 object Metamodel {
 
-  import Functors._
-
+  import org.scalastuff.util.Functors._
+  import org.scalastuff.util.ForEach._
+  
   def apply[A: Manifest](): NotConvertedMetamodel = apply(scalaTypeOf[A])
   def apply(scalaType: ScalaType): NotConvertedMetamodel = (scalaType match {
     case OptionType(elementType) => new ContainerMetamodelImpl[Option](scalaType, apply(elementType))
