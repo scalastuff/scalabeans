@@ -4,7 +4,7 @@ import org.junit.Test
 import org.junit.Assert._
 import Preamble._
 import org.scalastuff.scalabeans.types._
-import org.scalastuff.util.Converter
+import org.scalastuff.scalabeans.converters.Converter
 
 class BeanDescriptorTest {
   import testbeans._
@@ -191,7 +191,7 @@ class BeanDescriptorTest {
     val bdAfter = (descriptorOf[PropertiesTestBean] rewrite metamodelRules {
       case mm @ Metamodel(StringType) => mm.convert(Converter[String, Int](_.toInt, _.toString))
     }).asInstanceOf[BeanDescriptor].
-    withConstructor ({ i1: Int => new PropertiesTestBean(i1.toString(), "20") }, "immutableCP" -> None)
+    withConstructor ({ s1: String => new PropertiesTestBean(s1, "20") }, "immutableCP" -> None)
 
     val bean1 = bdBefore.newInstance(10).asInstanceOf[PropertiesTestBean]
     check(bean1, bdBefore)

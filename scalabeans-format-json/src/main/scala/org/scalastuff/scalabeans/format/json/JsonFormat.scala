@@ -2,10 +2,10 @@ package org.scalastuff.scalabeans.format.json
 
 import java.io.InputStream
 import java.io.OutputStream
-import org.scalastuff.util.StringFormat
 import com.fasterxml.jackson.core.JsonFactory
 import java.io.ByteArrayOutputStream
 import java.io.StringWriter
+import org.scalastuff.scalabeans.format.StringFormat
 
 class JsonFormat[A](jsonFactory: JsonFactory, handler: JsonHandler) extends StringFormat[A] {
   import org.scalastuff.util.Loan._

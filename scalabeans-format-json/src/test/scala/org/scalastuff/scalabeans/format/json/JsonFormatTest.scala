@@ -5,7 +5,6 @@ import org.scalastuff.scalabeans.Preamble._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalastuff.scalabeans.testmono._
-import org.scalastuff.util.Format
 
 @RunWith(classOf[JUnitRunner])
 class JsonFormatTest extends FlatSpec 

@@ -1,7 +1,9 @@
 package org.scalastuff.scalabeans.testmono
-import org.scalastuff.util.Format
+
 import org.scalatest.matchers.ShouldMatchers
-import org.scalastuff.util.StringFormat
+import org.scalastuff.scalabeans.format.Format
+import org.scalastuff.scalabeans.format.StringFormat
+
 
 trait MonoBehaviours {
   type Mono[A]

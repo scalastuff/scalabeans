@@ -75,14 +75,24 @@ abstract class BeanBuilder {
   }
 
   /**
-   * Receives value used to initialize given property of new bean instance.
+   * Receives visible value used to initialize given property of new bean instance.
    *
    * Only constructor parameters and mutable properties are supported.
    * Method throws IllegalArgumentException on attempt to set immutable property value.
    */
-  def set(property: PropertyDescriptor, value: Any): Unit = property match {
+  def set(property: PropertyDescriptor, value: Any): Unit = {
+    setUnderlying(property, property.metamodel.toUnderlying(value))
+  }
+  
+  /**
+   * Receives underlying value used to initialize given property of new bean instance.
+   *
+   * Only constructor parameters and mutable properties are supported.
+   * Method throws IllegalArgumentException on attempt to set immutable property value.
+   */
+  def setUnderlying(property: PropertyDescriptor, value: Any): Unit = property match {
     case cp: ConstructorParameter =>
-      constructorParamValues(cp.index) = property.model.ctorArgMetamodel.converter.from(value).asInstanceOf[AnyRef]
+      constructorParamValues(cp.index) = value.asInstanceOf[AnyRef]
       unsetConstructorParams(cp.index) = false
     case mp: MutablePropertyDescriptor =>
       mutablePropertyValues(mp.index) = value
@@ -90,8 +100,12 @@ abstract class BeanBuilder {
     case _ => throw new IllegalArgumentException("Cannot set property value: only constructor parameters and mutable properties are accepted")
   }
 
-  def get[A](property: PropertyDescriptor): A = property match {
-    case cp: ConstructorParameter => property.model.ctorArgMetamodel.converter.to(constructorParamValues(cp.index)).asInstanceOf[A]
+  def get[A](property: PropertyDescriptor): A = {
+    property.metamodel.toVisible(getUnderlying[Any](property)).asInstanceOf[A]
+  }
+  
+  def getUnderlying[A](property: PropertyDescriptor): A = property match {
+    case cp: ConstructorParameter => constructorParamValues(cp.index).asInstanceOf[A]
     case mp: MutablePropertyDescriptor => mutablePropertyValues(mp.index).asInstanceOf[A]
     case _ => sys.error("Cannot get property value: only constructor parameters and mutable properties are accepted")
   }
@@ -128,7 +142,7 @@ abstract class BeanBuilder {
     val instance = constructor.newInstance(constructorParamValues)
 
     mutableProperties withFilter { prop => !unsetMutableProperties(prop.index) } foreach { prop =>
-      prop.set(instance, mutablePropertyValues(prop.index))
+      prop.setUnderlying(instance, mutablePropertyValues(prop.index))
     }
 
     instance

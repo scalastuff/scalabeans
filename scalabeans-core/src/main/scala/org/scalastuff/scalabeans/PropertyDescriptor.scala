@@ -20,7 +20,7 @@ import java.lang.reflect.{ AnnotatedElement, Modifier, Method, Field }
 import Preamble._
 import org.scalastuff.scalabeans.types._
 import org.scalastuff.scalabeans.sig.ScalaTypeCompiler
-import org.scalastuff.util.Converter
+import org.scalastuff.scalabeans.converters.Converter
 import org.scalastuff.util.Rules
 
 trait PropertyDescriptor {
@@ -43,17 +43,21 @@ trait PropertyDescriptor {
    */
   def metamodel = model.metamodel
 
-  def rewriteMetamodel(rules: Rules[Metamodel]) = clone(model.rewriteMetamodel(rules))
-  
-  def updateMetamodel(_metamodel: Metamodel) = rewriteMetamodel(metamodelRules {
-    case Metamodel(model.metamodel.visibleMetamodel.scalaType) => LeafMetamodel(_metamodel)
-  })
-  
+  def rewriteMetamodel(rules: Rules[Metamodel]) = clone(model.copy(metamodel = model.metamodel.rewrite(rules)))
+
+  def updateMetamodel(_metamodel: => Metamodel) = {
+    require(metamodel.scalaType == _metamodel.scalaType,
+      "Cannot update property metamodel: expect metamodel for type %s, found %s".
+        format(metamodel.scalaType, _metamodel.scalaType))
+        
+    clone(model.copy(metamodel =_metamodel))
+  }
+
   /**
    * Type of the visible value
    */
   def visibleType = metamodel.visibleMetamodel.scalaType
-  
+
   /**
    * Original type of the property value (without any conversions)
    */
@@ -78,11 +82,11 @@ trait PropertyDescriptor {
    *
    * If metamodel of the property value contains conversions, this method returns converted (visible) value.
    * This method is inefficient in cases when ContainerMetamodel has elementMetamodel with conversions. Better
-   * approach is to get underlying container and convert elements. 
-   * 
+   * approach is to get underlying container and convert elements.
+   *
    * For example, when Array[Int] has to be converted to Array[String] this method will
    * perform actual conversion of underlying Array[Int] to visible Array[String].
-   * 
+   *
    * Another side-effect of conversion is distortion of object references unless conversion functions are memos.
    *
    * @param obj bean object
@@ -107,7 +111,7 @@ trait PropertyDescriptor {
    */
   def beanType: ScalaType = model.beanType
 
-  override def toString = "%s : %s // tag: %d".format(name, metamodel.scalaType.toString, tag)
+  override def toString = "%s : %s // tag: %d".format(name, visibleType, tag)
 
   private[scalabeans] val model: PropertyDescriptor.Model
 
@@ -244,7 +248,6 @@ object PropertyDescriptor {
     val beanType: ScalaType,
     val name: String,
     _metamodel: => Metamodel,
-    _ctorArgMetamodel: => Metamodel,
     val tag: Int,
     val getter: (AnyRef => Any),
     val setter: Option[(AnyRef, Any) => Unit],
@@ -252,82 +255,25 @@ object PropertyDescriptor {
     val findAnnotation: (Manifest[_] => Option[_]) = { _ => None },
     val isInherited: Boolean = false) {
 
-    def this(
-      beanType: ScalaType,
-      name: String,
-      _metamodel: => Metamodel,
-      tag: Int,
-      getter: (AnyRef => Any),
-      setter: Option[(AnyRef, Any) => Unit],
-      defaultValue: Option[() => Any] = None,
-      findAnnotation: (Manifest[_] => Option[_]) = { _ => None },
-      isInherited: Boolean = false) = this(beanType,
-      name,
-      _metamodel,
-      _metamodel,
-      tag,
-      getter,
-      setter,
-      defaultValue,
-      findAnnotation,
-      isInherited)
-
     def copy(
       name: String = this.name,
       tag: Int = this.tag,
+      metamodel: => Metamodel = _metamodel,
       getter: (AnyRef => Any) = this.getter,
       setter: Option[(AnyRef, Any) => Unit] = this.setter,
       defaultValue: Option[() => Any] = this.defaultValue) =
       new Model(
         this.beanType,
         name,
-        _metamodel,
-        _ctorArgMetamodel,
-        tag,
-        getter,
-        setter,
-        defaultValue,
-        this.findAnnotation,
-        this.isInherited)
-    
-    lazy val metamodel = _metamodel
-    lazy val ctorArgMetamodel = {
-      val result = _ctorArgMetamodel
-      require(result.visibleMetamodel.scalaType == metamodel.visibleMetamodel.scalaType,
-          "Cannot calculate metamodel of constructor argument: " +
-          "calculated visible type %s doesn't match with visible property value type %s. " +
-          "This can be a result of previous metamodel rewrites.".
-          format(result.visibleMetamodel.scalaType, metamodel.visibleMetamodel.scalaType))
-      
-      result
-    }
-    
-    def rewriteMetamodel(rules: Rules[Metamodel]) = new Model(
-        this.beanType,
-        name,
-        metamodel rewrite rules,
-        ctorArgMetamodel rewrite rules,
-        tag,
-        getter,
-        setter,
-        defaultValue,
-        this.findAnnotation,
-        this.isInherited)
-    
-    def resetCtorArgMetamodel = new Model(
-        this.beanType,
-        name,
         metamodel,
-        ctorArgMetamodel match {
-          case cv: ConvertedMetamodel => cv.visibleMetamodel
-          case _ => ctorArgMetamodel
-        },
         tag,
         getter,
         setter,
         defaultValue,
         this.findAnnotation,
-        this.isInherited) 
+        this.isInherited)
+
+    lazy val metamodel = _metamodel
   }
 
   private[scalabeans] object Model {

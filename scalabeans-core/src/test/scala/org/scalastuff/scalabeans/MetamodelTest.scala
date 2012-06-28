@@ -6,7 +6,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalastuff.scalabeans.types._
 import Preamble._
-import org.scalastuff.util.Converter
+import org.scalastuff.scalabeans.converters.Converter
 import java.util.Date
 
 @RunWith(classOf[JUnitRunner])

@@ -1,4 +1,4 @@
-package org.scalastuff.util
+package org.scalastuff.scalabeans.format
 
 import java.io.InputStream
 import java.io.OutputStream

@@ -2,11 +2,12 @@ package org.scalastuff.scalabeans
 
 import scala.reflect.ScalaSignature
 import org.scalastuff.scalabeans.types._
-import org.scalastuff.util.Converter
+import org.scalastuff.scalabeans.converters.Converter
 import Preamble._
 import org.scalastuff.util.Rules
 import scala.collection.mutable.Builder
-import org.scalastuff.util.{Functor, ForEach}
+import org.scalastuff.util.{ Functor, ForEach }
+import org.scalastuff.scalabeans.converters.RuntimeConverter
 
 /**
  *  Represents information about 2 models: underlying and visible.
@@ -23,12 +24,21 @@ abstract class Metamodel { self =>
   val scalaType: ScalaType
 
   val visibleMetamodel: NotConvertedMetamodel
-  
+
   val converter: Converter[Any, Any]
 
-  def convert[A: Manifest, B: Manifest](_converter: Converter[A, B]): ConvertedMetamodel
+  @inline final def convert[A: Manifest, B: Manifest](converter: Converter[A, B]): ConvertedMetamodel =
+    convert(RuntimeConverter(scalaTypeOf[A], scalaTypeOf[B], converter))
 
-  def convert(_converter: Converter[_, _], _visibleMetamodel: NotConvertedMetamodel): ConvertedMetamodel
+  final def convert(runtimeConverter: RuntimeConverter): ConvertedMetamodel = {
+    require(visibleMetamodel.scalaType == runtimeConverter.sourceType,
+      "Cannot create ConvertedMetamodel: source type %s of the converter doesn't match with the visible ScalaType %s of this metamodel".
+        format(runtimeConverter.sourceType, visibleMetamodel.scalaType))
+
+    convert(runtimeConverter.converter.asInstanceOf[Converter[Any, Any]], metamodelOf(runtimeConverter.targetType))
+  }
+
+  protected def convert(converter: Converter[Any, Any], _visibleMetamodel: NotConvertedMetamodel): ConvertedMetamodel
 
   def toVisible(underlying: Any) = converter.to(underlying)
   def toUnderlying(visible: Any) = converter.from(visible)
@@ -39,10 +49,7 @@ abstract class Metamodel { self =>
     require(this.scalaType == result.scalaType,
       "Cannot rewrite: expect metamodel for type %s, found %s".format(this.scalaType, result.scalaType))
 
-    result match {
-      case LeafMetamodel(metamodel) => metamodel
-      case _ => result.rewriteChildMetamodels(rules)
-    }
+    result.rewriteChildMetamodels(rules)
   }
 
   def rewriteChildMetamodels(rules: Rules[Metamodel]): Metamodel
@@ -53,18 +60,9 @@ abstract class Metamodel { self =>
 abstract class NotConvertedMetamodel extends Metamodel {
   final val visibleMetamodel = this
   final val converter = Converter.identity[Any]
-  
-  def convert[A: Manifest, B: Manifest](_converter: Converter[A, B]): ConvertedMetamodel = {
-    require(scalaType == scalaTypeOf[A], "Source type of the converter doesn't match with the ScalaType of this metamodel")
 
-    convert(_converter, metamodelOf[B])
-  }
-
-  def convert(_converter: Converter[_, _], _visibleMetamodel: NotConvertedMetamodel): ConvertedMetamodel = {
-    new ConvertedValueMetamodel(
-      scalaType,
-      _converter.asInstanceOf[Converter[Any, Any]],
-      _visibleMetamodel)
+  protected def convert(_converter: Converter[Any, Any], _visibleMetamodel: NotConvertedMetamodel): ConvertedMetamodel = {
+    new ConvertedValueMetamodel(scalaType, _converter, _visibleMetamodel)
   }
 }
 
@@ -77,32 +75,8 @@ final case class ValueMetamodel(val scalaType: ScalaType) extends NotConvertedMe
   def rewriteChildMetamodels(rules: Rules[Metamodel]) = this
 }
 
-/**
- * Must be used inside rewrite rules only, signals to rewriting strategy
- * to not rewrite childs of encapsulated metamodel.
- *
- * It is transparent to the client, ie rewrite(..) will never return it.
- */
-final case class LeafMetamodel(val wrapped: Metamodel) extends NotConvertedMetamodel {
-  /*
-   * Actually subclassing Metamodel is a hack. It would be better to use union type Metamodel V Leaf
-   * as result of Rules. Good idea for the future refactorings. 
-   */
-  val scalaType = wrapped.scalaType
-
-  def rewriteChildMetamodels(rules: Rules[Metamodel]) = this
-}
-
 abstract class ConvertedMetamodel extends Metamodel { self =>
-  def convert[A: Manifest, B: Manifest](_converter: Converter[A, B]) = {
-    require(visibleMetamodel.scalaType == scalaTypeOf[A],
-      "Cannot create ConvertedMetamodel: source type %s of the converter doesn't match with the visible ScalaType %s of this metamodel".
-        format(scalaTypeOf[A], visibleMetamodel.scalaType))
-
-    convert(_converter, metamodelOf[B])
-  }
-
-  def convert(_converter: Converter[_, _], _visibleMetamodel: NotConvertedMetamodel): ConvertedMetamodel = {
+  protected def convert(_converter: Converter[Any, Any], _visibleMetamodel: NotConvertedMetamodel): ConvertedMetamodel = {
     new ConvertedValueMetamodel(
       scalaType,
       converter.compose(_converter.asInstanceOf[Converter[Any, Any]]),
@@ -132,34 +106,42 @@ class ConvertedValueMetamodel private[scalabeans] (
 trait ContainerMetamodel extends Metamodel { self =>
 
   type M[A]
-  
+
   def elementMetamodel: Metamodel
   implicit def functor: Functor[M]
   implicit def forEach: ForEach[M]
-    
+
   require(scalaType.arguments.size == 1,
     "ScalaType of container must have only 1 argument (type parameter)")
 
   require(scalaType.arguments(0) == elementMetamodel.scalaType,
     "elementMetamodel doesn't match with the container type")
 
-  def rewriteChildMetamodels(rules: Rules[Metamodel]) = elementMetamodel.rewrite(rules) match {
-    case cv: ConvertedMetamodel =>
-      new ContainerMetamodelWithConvertedElement[M](scalaType, cv)
-    case mm @ _ =>
-      new ContainerMetamodelImpl[M](scalaType, mm)
+  def updateElementMetamodel(_elementMetamodel: Metamodel): Metamodel = {
+    require(elementMetamodel.scalaType == _elementMetamodel.scalaType,
+      "Cannot update element metamodel: expect metamodel for type %s, found %s".
+        format(elementMetamodel.scalaType, _elementMetamodel.scalaType))
+
+    _elementMetamodel match {
+      case cv: ConvertedMetamodel =>
+        new ContainerMetamodelWithConvertedElement[M](scalaType, cv)
+      case mm @ _ =>
+        new ContainerMetamodelImpl[M](scalaType, mm)
+    }
   }
-  
+
+  def rewriteChildMetamodels(rules: Rules[Metamodel]) = updateElementMetamodel(elementMetamodel.rewrite(rules))
+
   private lazy val newBuilderF: () => Builder[Any, M[Any]] = {
     scalaType match {
-      case at @ ArrayType(_) => Some({ () => at.newArrayBuilder[Any]().asInstanceOf[Builder[Any, M[Any]]]})
+      case at @ ArrayType(_) => Some({ () => at.newArrayBuilder[Any]().asInstanceOf[Builder[Any, M[Any]]] })
       case coll @ CollectionType(_) => coll.newBuilder.asInstanceOf[Option[() => Builder[Any, M[Any]]]]
       case _ => None
     }
   } getOrElse {
     sys.error("No builder is found for type " + scalaType)
   }
-  
+
   def newBuilder() = newBuilderF()
 
   override def toString() = "ContainerMetamodel(%s, %s)".format(scalaType, elementMetamodel)
@@ -167,9 +149,9 @@ trait ContainerMetamodel extends Metamodel { self =>
 
 class ContainerMetamodelImpl[MM[_]](
   val scalaType: ScalaType,
-  val elementMetamodel: Metamodel)(implicit val functor: Functor[MM], val forEach: ForEach[MM]) 
+  val elementMetamodel: Metamodel)(implicit val functor: Functor[MM], val forEach: ForEach[MM])
   extends NotConvertedMetamodel with ContainerMetamodel {
-  
+
   type M[A] = MM[A]
 }
 
@@ -191,7 +173,7 @@ class ContainerMetamodelWithConvertedElement[MM[_]](
   extends ConvertedMetamodel with ContainerMetamodel {
 
   type M[A] = MM[A]
-  
+
   /**
    * Provides conversion of the container to/from visible type using fmap and element converter.
    */
@@ -207,7 +189,7 @@ object Metamodel {
 
   import org.scalastuff.util.Functors._
   import org.scalastuff.util.ForEach._
-  
+
   def apply[A: Manifest](): NotConvertedMetamodel = apply(scalaTypeOf[A])
   def apply(scalaType: ScalaType): NotConvertedMetamodel = (scalaType match {
     case OptionType(elementType) => new ContainerMetamodelImpl[Option](scalaType, apply(elementType))
@@ -235,11 +217,9 @@ trait Metamodels {
       case p @ PropertyDescriptor("_2", _) => p.updateMetamodel(valueMetamodel)
     }
   }
-  
+
   def OptionMetamodel(elementMetamodel: Metamodel) = {
-    val cm = metamodelOf(OptionType(elementMetamodel.scalaType))
-    cm rewrite metamodelRules {
-      case ContainerMetamodel(_) => LeafMetamodel(elementMetamodel)
-    }
+    val cm = metamodelOf(OptionType(elementMetamodel.scalaType)).
+      asInstanceOf[ContainerMetamodel].updateElementMetamodel(elementMetamodel)
   }
 }

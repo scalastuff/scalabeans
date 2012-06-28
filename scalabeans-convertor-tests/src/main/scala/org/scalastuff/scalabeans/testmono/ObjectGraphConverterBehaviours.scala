@@ -2,7 +2,6 @@ package org.scalastuff.scalabeans.testmono
 
 import org.scalastuff.scalabeans.Preamble._
 import org.scalatest.FlatSpec
-import org.scalastuff.util.Converter
 import org.scalatest.matchers.ShouldMatchers
 
 trait ObjectGraphMonoBehaviours extends MonoBehaviours with ShouldMatchers { self: FlatSpec =>

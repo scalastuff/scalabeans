@@ -1,9 +1,9 @@
-package org.scalastuff.scalabeans
+package org.scalastuff.scalabeans.converters
 
 import org.scalastuff.scalabeans.types.ScalaType
-import Preamble._
-import org.scalastuff.util.Converter
+import org.scalastuff.scalabeans.Preamble._
 import org.scalastuff.util.Rules
+import org.scalastuff.scalabeans.Metamodel
 
 /**
  * Provides interface for creation of Converter[A, Target] objects for specific ScalaType.
@@ -33,5 +33,5 @@ trait ConverterFactory {
 
   def converterFor[A <: AnyRef: Manifest](): C[A] = converterFor[A](scalaTypeOf[A])
 
-  protected def converterFor[A <: AnyRef: Manifest](scalaType: ScalaType): C[A]
+  def converterFor[A <: AnyRef](scalaType: ScalaType): C[A]
 }

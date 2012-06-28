@@ -265,7 +265,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
   def withConstructor(ctor: () => AnyRef): BeanDescriptor = {
     BeanDescriptor(
       scalaType,
-      properties.view.map(_.model.resetCtorArgMetamodel),
+      properties.view.map(_.model),
       Some(ConstructorModel({ args: Array[AnyRef] => ctor() }, Seq.empty)))
   }
 
@@ -275,7 +275,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
   def withConstructor[P1](ctor: P1 => AnyRef, arg1: Pair[String, Option[() => P1]]): BeanDescriptor = {
     BeanDescriptor(
       scalaType,
-      properties.view.map(_.model.resetCtorArgMetamodel),
+      properties.view.map(_.model),
       Some(ConstructorModel({ args: Array[AnyRef] => ctor(args(0).asInstanceOf[P1]) }, Seq(arg1))))
   }
 
@@ -285,7 +285,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
   def withConstructor[P1, P2](ctor: (P1, P2) => AnyRef, arg1: Pair[String, Option[() => P1]], arg2: Pair[String, Option[() => P2]]): BeanDescriptor = {
     BeanDescriptor(
       scalaType,
-      properties.view.map(_.model.resetCtorArgMetamodel),
+      properties.view.map(_.model),
       Some(ConstructorModel({ args: Array[AnyRef] =>
         ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2])
       },
@@ -302,7 +302,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
     arg3: Pair[String, Option[() => P3]]): BeanDescriptor = {
     BeanDescriptor(
       scalaType,
-      properties.view.map(_.model.resetCtorArgMetamodel),
+      properties.view.map(_.model),
       Some(ConstructorModel({ args: Array[AnyRef] =>
         ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2], args(2).asInstanceOf[P3])
       },
@@ -320,7 +320,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
     arg4: Pair[String, Option[() => P4]]): BeanDescriptor = {
     BeanDescriptor(
       scalaType,
-      properties.view.map(_.model.resetCtorArgMetamodel),
+      properties.view.map(_.model),
       Some(ConstructorModel({ args: Array[AnyRef] =>
         ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2], args(2).asInstanceOf[P3], args(3).asInstanceOf[P4])
       },
@@ -339,7 +339,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
     arg5: Pair[String, Option[() => P5]]): BeanDescriptor = {
     BeanDescriptor(
       scalaType,
-      properties.view.map(_.model.resetCtorArgMetamodel),
+      properties.view.map(_.model),
       Some(ConstructorModel({ args: Array[AnyRef] =>
         ctor(args(0).asInstanceOf[P1], args(1).asInstanceOf[P2], args(2).asInstanceOf[P3], args(3).asInstanceOf[P4], args(4).asInstanceOf[P5])
       },
@@ -352,10 +352,10 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
    * Only bean properties can be used as constructor parameters.
    *
    * @param ctor Bean constructor. Size of the array supplied to this function at runtime
-   *             will be equal to the number of property names provided. Actual types will
-   *             be assignable to the corresponding property types. If type conversion was
-   *             applied to the properties '''before''' injection of new constructor,
-   *             converted (new) types will be supplied to the constructor.
+   *             will be equal to the number of property names provided. Actual types must
+   *             be assignable to the corresponding property types. Constructor gets always
+   *             underlying values so that application of constructor is consistent with
+   *             application of setters.
    *
    * @param args Property names used as constructor parameters with optional default values.
    *
@@ -364,7 +364,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
   def withConstructor(ctor: Array[AnyRef] => AnyRef, args: Pair[String, Option[() => Any]]*) = {
     BeanDescriptor(
       scalaType,
-      properties.view.map(_.model.resetCtorArgMetamodel),
+      properties.view.map(_.model),
       Some(ConstructorModel(ctor, args)))
   }
 
