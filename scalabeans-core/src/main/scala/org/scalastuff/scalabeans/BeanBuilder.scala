@@ -80,8 +80,8 @@ abstract class BeanBuilder {
    * Only constructor parameters and mutable properties are supported.
    * Method throws IllegalArgumentException on attempt to set immutable property value.
    */
-  def set(property: PropertyDescriptor, value: Any): Unit = {
-    setUnderlying(property, property.metamodel.toUnderlying(value))
+  def setVisible(property: PropertyDescriptor, value: Any): Unit = {
+    set(property, property.typeMetaModel.toUnderlying(value))
   }
   
   /**
@@ -90,7 +90,7 @@ abstract class BeanBuilder {
    * Only constructor parameters and mutable properties are supported.
    * Method throws IllegalArgumentException on attempt to set immutable property value.
    */
-  def setUnderlying(property: PropertyDescriptor, value: Any): Unit = property match {
+  def set(property: PropertyDescriptor, value: Any): Unit = property match {
     case cp: ConstructorParameter =>
       constructorParamValues(cp.index) = value.asInstanceOf[AnyRef]
       unsetConstructorParams(cp.index) = false
@@ -100,11 +100,11 @@ abstract class BeanBuilder {
     case _ => throw new IllegalArgumentException("Cannot set property value: only constructor parameters and mutable properties are accepted")
   }
 
-  def get[A](property: PropertyDescriptor): A = {
-    property.metamodel.toVisible(getUnderlying[Any](property)).asInstanceOf[A]
+  def getVisible[A](property: PropertyDescriptor): A = {
+    property.typeMetaModel.toVisible(get[Any](property)).asInstanceOf[A]
   }
   
-  def getUnderlying[A](property: PropertyDescriptor): A = property match {
+  def get[A](property: PropertyDescriptor): A = property match {
     case cp: ConstructorParameter => constructorParamValues(cp.index).asInstanceOf[A]
     case mp: MutablePropertyDescriptor => mutablePropertyValues(mp.index).asInstanceOf[A]
     case _ => sys.error("Cannot get property value: only constructor parameters and mutable properties are accepted")
@@ -142,7 +142,7 @@ abstract class BeanBuilder {
     val instance = constructor.newInstance(constructorParamValues)
 
     mutableProperties withFilter { prop => !unsetMutableProperties(prop.index) } foreach { prop =>
-      prop.setUnderlying(instance, mutablePropertyValues(prop.index))
+      prop.set(instance, mutablePropertyValues(prop.index))
     }
 
     instance

@@ -1,14 +1,37 @@
 Introduction
 ============
 
-ScalaBeans is a reflection library for Scala. Its aims are similar to JavaBeans, but scala-specific features have been added:
+ScalaBeans is a reflection library for Scala. Reflection is used to build immutable Metamodel object for a given type.
+Metamodel contains metainformation about underlying data structure (like bean property names, types, bean constructors,
+collection builders etc) and can be used to introspect it. 
 
+Metamodel can be recursively rewritten using provided rules to alter visible metamodel (underlying object stays the same). 
+
+Metamodel can also be used to construct a Format or a Converter for given data structure.
+
+Metamodel features:
 * Recognizes scala properties
 * Can handle immutable and case classes
 * Scala collections are supported, including builders
-* Preserve generic type information
+* Generic type information is preserved
 * Type pattern matching (including generic type arguments)
-* High performance serialization to/from protobuf, json, xml
+
+Important rewrites (see API for complete list):
+* rename bean properties
+* add/hide bean properties
+* inject bean factory methods
+* type conversion
+
+Supported Formats:
+* Protobuf, protostuff (using protostuff)
+* JSON (using jackson)
+* planned: smile
+
+Supported Converters (planned):
+* DbObject (mongodb)
+* JsValue (playframework)
+* Jodatime (can be injected into other Formats and Converters using Metamodel rewrites)
+
 
 Further information:
 
@@ -18,12 +41,6 @@ Further information:
 
 Getting started
 ===============
-	
-If you use SBT, add following lines to your project:	
-
-    val scalaStuffRepo = "Sonatype OSS releases" at "http://oss.sonatype.org/content/repositories/releases"
-    val scalabeans = "org.scalastuff" % "scalabeans" % "0.2"
-
 
 If you use Maven, add following lines to your pom.xml:
 
@@ -32,8 +49,15 @@ If you use Maven, add following lines to your pom.xml:
       <dependency>
         <groupId>org.scalastuff</groupId>
         <artifactId>scalabeans</artifactId>
-        <version>0.2</version>
+        <version>0.9-SNAPSHOT</version>
       </dependency>
     </dependencies>
-    
-For Scala 2.8.x use scalabeans_2.8.1 artifactId
+
+    <repositories>
+    ...
+
+      <repository>
+        <id>Sonatype OSS snapshots</id>
+        <url>http://oss.sonatype.org/content/repositories/snapshots</url>    
+      </repository>
+    </repositories>

@@ -26,11 +26,11 @@ class IntrospectionScalaBeanTests {
   //@Test
   def testMe {
     val bean = descriptorOf[GreatPerson]
-    println(bean("xxxx").findAnnotation[Deprecated])
+    println(bean.property("xxxx").findAnnotation[Deprecated])
 
     for (p <- bean.properties) {
       print(p + ": " + p.getClass.getName)
-      p.metamodel.scalaType match {
+      p.visibleType match {
         case OptionType(IntType) => println(" Option of Int")
         case AddressType => println("ADDRESS")
         case OptionType(AddressType) => println("OPTIONAL ADDRESS")

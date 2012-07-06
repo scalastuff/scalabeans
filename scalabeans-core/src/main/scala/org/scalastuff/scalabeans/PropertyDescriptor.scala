@@ -31,7 +31,11 @@ trait PropertyDescriptor {
    * Property name
    */
   def name = model.name
-  def rename(newName: String) = clone(model.copy(name = newName))
+  
+  /**
+   * Rename the property
+   */
+  def withName(newName: String) = clone(model.copy(name = newName))
 
   /**
    * Shows if this property value can be changed
@@ -39,29 +43,29 @@ trait PropertyDescriptor {
   def mutable: Boolean
 
   /**
-   * Metamodel of the property value
+   * Meta model of the property value
    */
-  def metamodel = model.metamodel
+  def typeMetaModel = model.metaModel
 
-  def rewriteMetamodel(rules: Rules[Metamodel]) = clone(model.copy(metamodel = model.metamodel.rewrite(rules)))
+  def rewriteTypeMetaModel(rules: Rules[MetaModel]) = clone(model.copy(metaModel = model.metaModel.rewrite(rules)))
 
-  def updateMetamodel(_metamodel: => Metamodel) = {
-    require(metamodel.scalaType == _metamodel.scalaType,
-      "Cannot update property metamodel: expect metamodel for type %s, found %s".
-        format(metamodel.scalaType, _metamodel.scalaType))
+  def withTypeMetaModel(_metaModel: => MetaModel) = {
+    require(typeMetaModel.scalaType == _metaModel.scalaType,
+      "Cannot update property metaModel: expect meta model for type %s, found %s".
+        format(typeMetaModel.scalaType, _metaModel.scalaType))
         
-    clone(model.copy(metamodel =_metamodel))
+    clone(model.copy(metaModel =_metaModel))
   }
 
   /**
    * Type of the visible value
    */
-  def visibleType = metamodel.visibleMetamodel.scalaType
+  def visibleType = typeMetaModel.visibleMetaModel.scalaType
 
   /**
    * Original type of the property value (without any conversions)
    */
-  def underlyingType = metamodel.scalaType
+  def underlyingType = typeMetaModel.scalaType
 
   /**
    * Unique id of the property within the bean.
@@ -75,13 +79,13 @@ trait PropertyDescriptor {
   /**
    * Creates a copy of this PropertyDescriptor using new tag value
    */
-  def retag(newTag: Int) = clone(model.copy(tag = newTag))
+  def withTag(newTag: Int) = clone(model.copy(tag = newTag))
 
   /**
    * Gets property value from given bean.
    *
-   * If metamodel of the property value contains conversions, this method returns converted (visible) value.
-   * This method is inefficient in cases when ContainerMetamodel has elementMetamodel with conversions. Better
+   * If meta model of the property value contains conversions, this method returns converted (visible) value.
+   * This method is inefficient in cases when ContainerMetaModel has elementMetaModel with conversions. Better
    * approach is to get underlying container and convert elements.
    *
    * For example, when Array[Int] has to be converted to Array[String] this method will
@@ -91,15 +95,15 @@ trait PropertyDescriptor {
    *
    * @param obj bean object
    */
-  def get[A](obj: AnyRef): A = {
+  def getVisible[A](obj: AnyRef): A = {
     val underlying = model.getter(obj)
-    metamodel.toVisible(underlying).asInstanceOf[A]
+    typeMetaModel.toVisible(underlying).asInstanceOf[A]
   }
 
   /**
-   * Returns bean property value without any conversions possibly present in property value metamodel.
+   * Returns bean property value without any conversions possibly present in property value meta model.
    */
-  def getUnderlying[A](obj: AnyRef): A = model.getter(obj).asInstanceOf[A]
+  def get[A](obj: AnyRef): A = model.getter(obj).asInstanceOf[A]
 
   /**
    * Looks if property is annotated with given annotation class and returns the annotation instance if found.
@@ -135,18 +139,9 @@ trait MutablePropertyDescriptor extends DeserializablePropertyDescriptor {
 
   val mutable = true
 
-  def setUnderlying(obj: AnyRef, value: Any): Unit = model.setter.get.apply(obj, value)
+  def set(obj: AnyRef, value: Any): Unit = model.setter.get.apply(obj, value)
 
-  def set(obj: AnyRef, value: Any): Unit = {
-    metamodel match {
-      case cv: ConvertedMetamodel =>
-        setUnderlying(obj, cv.toUnderlying(value))
-      case _ =>
-        setUnderlying(obj, value)
-    }
-  }
-
-  //  def javaSet(obj: AnyRef, value: AnyRef): Unit
+  def setVisible(obj: AnyRef, value: Any): Unit = set(obj, typeMetaModel.toUnderlying(value))
 }
 
 trait ConstructorParameter extends DeserializablePropertyDescriptor {
@@ -247,7 +242,7 @@ object PropertyDescriptor {
   private[scalabeans] class Model(
     val beanType: ScalaType,
     val name: String,
-    _metamodel: => Metamodel,
+    _metaModel: => MetaModel,
     val tag: Int,
     val getter: (AnyRef => Any),
     val setter: Option[(AnyRef, Any) => Unit],
@@ -258,14 +253,14 @@ object PropertyDescriptor {
     def copy(
       name: String = this.name,
       tag: Int = this.tag,
-      metamodel: => Metamodel = _metamodel,
+      metaModel: => MetaModel = _metaModel,
       getter: (AnyRef => Any) = this.getter,
       setter: Option[(AnyRef, Any) => Unit] = this.setter,
       defaultValue: Option[() => Any] = this.defaultValue) =
       new Model(
         this.beanType,
         name,
-        metamodel,
+        metaModel,
         tag,
         getter,
         setter,
@@ -273,7 +268,7 @@ object PropertyDescriptor {
         this.findAnnotation,
         this.isInherited)
 
-    lazy val metamodel = _metamodel
+    lazy val metaModel = _metaModel
   }
 
   private[scalabeans] object Model {
@@ -294,7 +289,7 @@ object PropertyDescriptor {
       def immutableModelFromField(field: Field, typeHint: Option[ScalaType]) = new Model(
         _beanType,
         field.getName,
-        metamodelOf(typeHint getOrElse scalaTypeOf(field.getGenericType)),
+        metaModelOf(typeHint getOrElse scalaTypeOf(field.getGenericType)),
         _tag,
         field.get _,
         None,
@@ -305,7 +300,7 @@ object PropertyDescriptor {
       def mutableModelFromField(field: Field, typeHint: Option[ScalaType]) = new Model(
         _beanType,
         field.getName,
-        metamodelOf(typeHint getOrElse scalaTypeOf(field.getGenericType)),
+        metaModelOf(typeHint getOrElse scalaTypeOf(field.getGenericType)),
         _tag,
         field.get _,
         Some(field.set _),
@@ -316,7 +311,7 @@ object PropertyDescriptor {
       def modelFromGetter(getter: Method, typeHint: Option[ScalaType]) = new Model(
         _beanType,
         getter.getName,
-        metamodelOf(typeHint getOrElse scalaTypeOf(getter.getGenericReturnType)),
+        metaModelOf(typeHint getOrElse scalaTypeOf(getter.getGenericReturnType)),
         _tag,
         getter.invoke(_),
         None,
@@ -327,7 +322,7 @@ object PropertyDescriptor {
       def modelFromGetterSetter(getter: Method, setter: Method, typeHint: Option[ScalaType]) = new Model(
         _beanType,
         getter.getName,
-        metamodelOf(typeHint getOrElse scalaTypeOf(getter.getGenericReturnType)),
+        metaModelOf(typeHint getOrElse scalaTypeOf(getter.getGenericReturnType)),
         _tag,
         getter.invoke(_),
         Some({ (obj: AnyRef, value: Any) => setter.invoke(obj, value.asInstanceOf[AnyRef]) }),

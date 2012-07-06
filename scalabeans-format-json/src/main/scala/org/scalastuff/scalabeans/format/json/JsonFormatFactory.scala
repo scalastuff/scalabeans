@@ -8,14 +8,14 @@ import org.scalastuff.scalabeans.format.FormatFactory
 import org.scalastuff.scalabeans.format.StringFormat
 import org.scalastuff.scalabeans.converters.StandardConverterRules
 
-class JsonFormatFactory private (rules: Rules[Metamodel], jsonFactory: JsonFactory) extends FormatFactory {
+class JsonFormatFactory private (rules: Rules[MetaModel], jsonFactory: JsonFactory) extends FormatFactory {
   type This = JsonFormatFactory
   type F[A] = JsonFormat[A]
 
-  def withRewriteRules(_rules: Rules[Metamodel]) = new JsonFormatFactory(_rules andThen rules, jsonFactory)
+  def addRewriteRules(_rules: Rules[MetaModel]) = new JsonFormatFactory(_rules andThen rules, jsonFactory)
   def withJsonFactory(jsonFactory: JsonFactory) = new JsonFormatFactory(rules, jsonFactory)
 
-  def formatFor(metamodel: Metamodel): JsonFormat[Any] = {
+  def formatFor(metamodel: MetaModel): JsonFormat[Any] = {
     val updatedMetamodel = metamodel rewrite rules
     new JsonFormat(jsonFactory, JsonHandler(updatedMetamodel))
   }

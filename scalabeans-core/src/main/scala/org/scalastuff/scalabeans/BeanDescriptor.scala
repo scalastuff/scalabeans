@@ -22,7 +22,7 @@ import org.scalastuff.util.Rules
 /**
  * Contains bean information.
  */
-abstract class BeanDescriptor extends NotConvertedMetamodel {
+abstract class BeanDescriptor extends NotConvertedMetaModel {
 
   /**
    * @return bean class name
@@ -38,14 +38,17 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
    */
   def properties: Seq[PropertyDescriptor]
 
+  def withoutProperty(propertyName: String) = withoutProperties(propertyName) 
+    
   /**
    * Exclude properties with given names.
    *
    * Constructor parameters cannot be excluded.
-   */
-  def exclude(propertyNames: String*) = {
-    val ctorParams = propertyNames filter { propertyName =>
-      this.propertyOption(propertyName).map(_.isInstanceOf[ConstructorParameter]) getOrElse false
+   */  
+  def withoutProperties(_propertyName: String, _propertyNames: String*) = {
+    val propertyNames = _propertyName :: _propertyNames.toList
+    val ctorParams = propertyNames filter { _propertyName =>
+      this.propertyOption(_propertyName).map(_.isInstanceOf[ConstructorParameter]) getOrElse false
     }
     require(ctorParams.isEmpty, "Cannot exclude properties: %s are constructor parameters".format(ctorParams))
 
@@ -53,7 +56,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
   }
 
   /**
-   * Creates a copy of this BeanDescriptor with new property added
+   * Add new property
    */
   def addProperty[B <: AnyRef, P: Manifest](name: String, getter: B => P, setter: Option[(B, P) => Unit]): BeanDescriptor = {
     val newTag = (properties.view map (_.tag) max) + 1
@@ -61,36 +64,41 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
   }
 
   /**
-   * Creates a copy of this BeanDescriptor with new property added
+   * Add new property
    */
   def addProperty[B <: AnyRef, P: Manifest](name: String, getter: B => P, setter: Option[(B, P) => Unit], newTag: Int): BeanDescriptor = {
     val newPropertyModel =
       new PropertyDescriptor.Model(
         scalaType,
         name,
-        Preamble.metamodelOf[P],
+        Preamble.metaModelOf[P],
         newTag,
         getter.asInstanceOf[AnyRef => Any],
         setter.asInstanceOf[Option[(AnyRef, Any) => Unit]])
 
     updateProperties(properties :+ PropertyDescriptor(newPropertyModel, 0, -1, None))
   }
-  
+
   /**
-   * Rewrite properties of this BeanDescriptor applying given partial function 
+   * Map properties of this BeanDescriptor applying given partial function
    * to properties as Rules.
-   * 
-   * This method differs from rewrtieChildMetamodels(..) by its shallowness: changes are
-   * not propagated to child metamodels.
+   *
+   * This method differs from rewrtieChildMetaModels(..) by its shallowness: changes are
+   * not propagated to child meta models.
    */
-  def rewriteProperties(pf: PartialFunction[PropertyDescriptor, PropertyDescriptor]) = {
+  def mapProperties(pf: PartialFunction[PropertyDescriptor, PropertyDescriptor]) = {
     val propertyRules = Rules(pf)
-    
-    updateProperties(properties.map {pd => propertyRules(pd)})
+
+    updateProperties(properties.map { pd =>
+      val updatedProperty = propertyRules(pd)
+      require(pd.beanType == updatedProperty.beanType, "Cannot update property: bean types do not match")
+      // TODO: test index and type
+      updatedProperty
+    })
   }
-  
-  def rewriteChildMetamodels(rules: Rules[Metamodel]) =
-    updateProperties(properties.map {pd => pd.rewriteMetamodel(rules)})
+
+  def rewriteChildMetaModels(rules: Rules[MetaModel]) =
+    updateProperties(properties.map { pd => pd.rewriteTypeMetaModel(rules) })
 
   private[scalabeans] def updateProperties(newProperties: Seq[PropertyDescriptor]) = {
     def duplicates[A](coll: Seq[A]) = coll groupBy { x => x } filter { case (_, lst) => lst.size > 1 } keys
@@ -125,8 +133,17 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
     }
   }
 
-  @deprecated(message = "Use propertyOption method", since = "0.3")
-  def property(name: String) = propertyOption(name)
+  /**
+   * Convenience method for getting property descriptor by property name.
+   *
+   * @see [[org.scalastuff.scalabeans.ImmutablePropertyDescriptor]]
+   * @see [[org.scalastuff.scalabeans.MutablePropertyDescriptor]]
+   * @see [[org.scalastuff.scalabeans.ConstructorParameter]]
+   *
+   * @throws IllegalArgumentException if property not found
+   */
+  def property(name: String) = propertyOption(name) getOrElse
+    (throw new IllegalArgumentException("Property %s.%s not found".format(this.name, name)))
 
   /**
    * Bean property descriptor lookup
@@ -137,19 +154,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
    */
   def propertyOption(name: String): Option[PropertyDescriptor] = properties find (_.name == name)
 
-  /**
-   * Convenience method for getting property descriptor by property name.
-   *
-   * @see [[org.scalastuff.scalabeans.ImmutablePropertyDescriptor]]
-   * @see [[org.scalastuff.scalabeans.MutablePropertyDescriptor]]
-   * @see [[org.scalastuff.scalabeans.ConstructorParameter]]
-   *
-   * @throws IllegalArgumentException if property not found
-   */
-  def apply(name: String) = propertyOption(name) getOrElse
-    (throw new IllegalArgumentException("Property %s.%s not found".format(this.name, name)))
-
-  def constructor: Option[BeanConstructor]
+  protected[scalabeans] def constructor: Option[BeanConstructor]
 
   private[this] lazy val builderFactory = new BeanBuilderFactory(this)
 
@@ -167,6 +172,7 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
    *  * is immutable: only way to set it is via constructor
    *  * doesn't have default value
    */
+  @deprecated(message = "", since = "0.9")
   def needsBeanBuilder: Boolean = {
     properties exists { prop =>
       prop match {
@@ -178,18 +184,6 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
         case _ => false
       }
     }
-  }
-
-  /**
-   * @return bean class companion object (if any defined)
-   */
-  lazy val companion: Option[AnyRef] = try {
-    val cc = Class.forName(manifest.erasure.getName + "$")
-    Some(cc.getField("MODULE$").get(cc))
-  } catch {
-    case e =>
-      e.printStackTrace
-      None
   }
 
   /**
@@ -208,23 +202,33 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
     val builder = newBuilder()
 
     for (prop <- builder.constructorParams.iterator take args.size)
-      builder.set(prop, args(prop.index))
+      builder.setVisible(prop, args(prop.index))
 
     builder.result()
   }
 
   /**
-   * Convenience method to get property value.
+   * Convenience method to get underlying property value.
    *
    * @param obj bean instance which property must be looked up
    * @param propertyName property name
    *
    * @see [[org.scalastuff.scalabeans.PropertyDescriptor]]
    */
-  def get(obj: AnyRef, propertyName: String) = apply(propertyName).get[Any](obj)
+  def get(obj: AnyRef, propertyName: String) = property(propertyName).get[Any](obj)
+  
+  /**
+   * Convenience method to get visible property value.
+   *
+   * @param obj bean instance which property must be looked up
+   * @param propertyName property name
+   *
+   * @see [[org.scalastuff.scalabeans.PropertyDescriptor]]
+   */
+  def getVisible(obj: AnyRef, propertyName: String) = property(propertyName).getVisible[Any](obj)
 
   /**
-   * Convenience method to set property value.
+   * Convenience method to set underlying property value.
    *
    * @param obj bean instance which property must be looked up
    * @param propertyName property name
@@ -235,8 +239,26 @@ abstract class BeanDescriptor extends NotConvertedMetamodel {
    * @see [[org.scalastuff.scalabeans.MutablePropertyDescriptor]]
    */
   def set(obj: AnyRef, propertyName: String, value: Any) {
-    apply(propertyName) match {
+    property(propertyName) match {
       case mutable: MutablePropertyDescriptor => mutable.set(obj, value)
+      case _ => throw new IllegalArgumentException("Cannot set value: property %s.%s is immutable".format(this.name, propertyName))
+    }
+  }
+  
+  /**
+   * Convenience method to set visible property value.
+   *
+   * @param obj bean instance which property must be looked up
+   * @param propertyName property name
+   * @param value new property value
+   *
+   * @throws IllegalArgumentException if property is immutable
+   *
+   * @see [[org.scalastuff.scalabeans.MutablePropertyDescriptor]]
+   */
+  def setVisible(obj: AnyRef, propertyName: String, value: Any) {
+    property(propertyName) match {
+      case mutable: MutablePropertyDescriptor => mutable.setVisible(obj, value)
       case _ => throw new IllegalArgumentException("Cannot set value: property %s.%s is immutable".format(this.name, propertyName))
     }
   }
@@ -415,7 +437,7 @@ object BeanDescriptor {
     new BeanDescriptor {
       val scalaType = _beanType
       val properties = _properties
-      val constructor = ctorModelO map { ctorModel =>
+      protected[scalabeans] val constructor = ctorModelO map { ctorModel =>
         new BeanConstructor {
           def newInstance(args: Array[AnyRef]): AnyRef = ctorModel.ctor(args)
           val arity = ctorModel.parameters.size

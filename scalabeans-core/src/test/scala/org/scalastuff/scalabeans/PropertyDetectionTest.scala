@@ -49,7 +49,7 @@ class PropertyDetectionTest {
 
     for (p <- desc.properties) {
       print(p + ": " + p.getClass.getName)
-      p.metamodel.scalaType match {
+      p.visibleType match {
         case OptionType(IntType) => println(" Option of Int")
         case AddressType => println("ADDRESS")
         case OptionType(AddressType) => println("OPTIONAL ADDRESS")

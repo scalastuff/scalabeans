@@ -3,7 +3,7 @@ package org.scalastuff.scalabeans.converters
 import org.scalastuff.scalabeans.types.ScalaType
 import org.scalastuff.scalabeans.Preamble._
 import org.scalastuff.util.Rules
-import org.scalastuff.scalabeans.Metamodel
+import org.scalastuff.scalabeans.MetaModel
 
 /**
  * Provides interface for creation of Converter[A, Target] objects for specific ScalaType.
@@ -29,7 +29,7 @@ trait ConverterFactory {
    */
   type C[A] <: Converter[A, Target]
 
-  def withRewriteRules(rules: Rules[Metamodel]): This
+  def addRewriteRules(rules: Rules[MetaModel]): This
 
   def converterFor[A <: AnyRef: Manifest](): C[A] = converterFor[A](scalaTypeOf[A])
 

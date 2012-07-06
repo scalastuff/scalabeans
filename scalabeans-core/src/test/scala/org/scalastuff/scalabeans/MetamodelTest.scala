@@ -10,79 +10,79 @@ import org.scalastuff.scalabeans.converters.Converter
 import java.util.Date
 
 @RunWith(classOf[JUnitRunner])
-class MetamodelTest extends FlatSpec with ShouldMatchers {
-  "Converted ValueMetamodel" should "contain correct ScalaTypes and conversion" in {
-    val intMetamodel = metamodelOf[Int] rewrite metamodelRules {
-      case mm @ Metamodel(IntType) => mm.convert(Converter[Int, String](_.toString, _.toInt))
+class MetaModelTest extends FlatSpec with ShouldMatchers {
+  "Converted ValueMetaModel" should "contain correct ScalaTypes and conversion" in {
+    val intMetaModel = metaModelOf[Int] rewrite metamodelRules {
+      case mm @ MetaModel(IntType) => mm.addConverter(Converter[Int, String](_.toString, _.toInt))
     }
-    intMetamodel.scalaType should equal(IntType)
-    intMetamodel.converter.to(1) should be("1")
-    intMetamodel.converter.from("2") should be(2)
+    intMetaModel.scalaType should equal(IntType)
+    intMetaModel.converter.to(1) should be("1")
+    intMetaModel.converter.from("2") should be(2)
 
-    intMetamodel.isInstanceOf[ConvertedMetamodel] should be(true)
-    val cv = intMetamodel.asInstanceOf[ConvertedMetamodel]
-    cv.visibleMetamodel.scalaType should be(StringType)
+    intMetaModel.isInstanceOf[ConvertedMetaModel] should be(true)
+    val cv = intMetaModel.asInstanceOf[ConvertedMetaModel]
+    cv.visibleMetaModel.scalaType should be(StringType)
   }
 
-  "Converted ArrayMetamodel" should "contain correct ScalaTypes and conversion" in {
-    val testMetamodel = metamodelOf[Array[Int]] rewrite metamodelRules {
-      case mm @ Metamodel(IntType) => mm.convert(Converter[Int, String](_.toString, _.toInt))
+  "Converted ArrayMetaModel" should "contain correct ScalaTypes and conversion" in {
+    val testMetaModel = metaModelOf[Array[Int]] rewrite metamodelRules {
+      case mm @ MetaModel(IntType) => mm.addConverter(Converter[Int, String](_.toString, _.toInt))
     }
-    testMetamodel.scalaType should equal(ArrayType(IntType))
-    testMetamodel.converter.to(Array(1)) should be(Array("1"))
-    testMetamodel.converter.from(Array("2")) should be(Array(2))
+    testMetaModel.scalaType should equal(ArrayType(IntType))
+    testMetaModel.converter.to(Array(1)) should be(Array("1"))
+    testMetaModel.converter.from(Array("2")) should be(Array(2))
 
-    testMetamodel.isInstanceOf[ConvertedMetamodel] should be(true)
-    val cv = testMetamodel.asInstanceOf[ConvertedMetamodel]
-    cv.visibleMetamodel.scalaType should be(ArrayType(StringType))
+    testMetaModel.isInstanceOf[ConvertedMetaModel] should be(true)
+    val cv = testMetaModel.asInstanceOf[ConvertedMetaModel]
+    cv.visibleMetaModel.scalaType should be(ArrayType(StringType))
   }
 
-  "ArrayMetamodel, converted twice" should "contain correct ScalaTypes and conversion" in {
-    val testMetamodel = metamodelOf[Array[Int]] rewrite metamodelRules {
-      case mm @ Metamodel(IntType) => mm.convert(Converter[Int, String](_.toString, _.toInt))
+  "ArrayMetaModel, converted twice" should "contain correct ScalaTypes and conversion" in {
+    val testMetaModel = metaModelOf[Array[Int]] rewrite metamodelRules {
+      case mm @ MetaModel(IntType) => mm.addConverter(Converter[Int, String](_.toString, _.toInt))
     } rewrite metamodelRules {
-      case mm @ Metamodel(StringType) => mm.convert(Converter[String, Int](_.toInt, _.toString))
+      case mm @ MetaModel(StringType) => mm.addConverter(Converter[String, Int](_.toInt, _.toString))
     }
 
-    testMetamodel.scalaType should equal(ArrayType(IntType))
-    testMetamodel.converter.to(Array(1)) should be(Array(1))
-    testMetamodel.converter.from(Array(2)) should be(Array(2))
+    testMetaModel.scalaType should equal(ArrayType(IntType))
+    testMetaModel.converter.to(Array(1)) should be(Array(1))
+    testMetaModel.converter.from(Array(2)) should be(Array(2))
 
-    testMetamodel.isInstanceOf[ConvertedMetamodel] should be(true)
-    val cv = testMetamodel.asInstanceOf[ConvertedMetamodel]
-    cv.visibleMetamodel.scalaType should be(ArrayType(IntType))
+    testMetaModel.isInstanceOf[ConvertedMetaModel] should be(true)
+    val cv = testMetaModel.asInstanceOf[ConvertedMetaModel]
+    cv.visibleMetaModel.scalaType should be(ArrayType(IntType))
   }
 
-  "ValueMetamodel converted to ContainerMetamodel" should "be rewritable" in {
-    val testMetamodel = metamodelOf[Int] rewrite metamodelRules {
-      case mm @ Metamodel(IntType) => mm.convert(Converter[Int, Option[String]]({ i => Some("x" + i.toString) }, _.get.substring(1).toInt))
+  "ValueMetaModel converted to ContainerMetaModel" should "be rewritable" in {
+    val testMetaModel = metaModelOf[Int] rewrite metamodelRules {
+      case mm @ MetaModel(IntType) => mm.addConverter(Converter[Int, Option[String]]({ i => Some("x" + i.toString) }, _.get.substring(1).toInt))
     } rewrite metamodelRules {
-      case mm @ Metamodel(StringType) => mm.convert(Converter[String, Int](_.substring(1).toInt, "y" + _.toString))
+      case mm @ MetaModel(StringType) => mm.addConverter(Converter[String, Int](_.substring(1).toInt, "y" + _.toString))
     }
 
-    testMetamodel.scalaType should equal(IntType)
-    testMetamodel.converter.to(1) should be(Some(1))
-    testMetamodel.converter.from(Some(2)) should be(2)
+    testMetaModel.scalaType should equal(IntType)
+    testMetaModel.converter.to(1) should be(Some(1))
+    testMetaModel.converter.from(Some(2)) should be(2)
 
-    testMetamodel.isInstanceOf[ConvertedMetamodel] should be(true)
-    val cv = testMetamodel.asInstanceOf[ConvertedMetamodel]
-    cv.visibleMetamodel.scalaType should be(OptionType(IntType))
-    cv.visibleMetamodel.isInstanceOf[ContainerMetamodel] should be(true)
+    testMetaModel.isInstanceOf[ConvertedMetaModel] should be(true)
+    val cv = testMetaModel.asInstanceOf[ConvertedMetaModel]
+    cv.visibleMetaModel.scalaType should be(OptionType(IntType))
+    cv.visibleMetaModel.isInstanceOf[ContainerMetaModel] should be(true)
   }
 
-  "ValueMetamodel inside container converted to ContainerMetamodel" should "be rewritable" in {
-    val testMetamodel = metamodelOf[Array[Int]] rewrite metamodelRules {
-      case mm @ Metamodel(IntType) => mm.convert(Converter[Int, Option[String]]({ i => Some("x" + i.toString) }, _.get.toInt))
+  "ValueMetaModel inside container converted to ContainerMetaModel" should "be rewritable" in {
+    val testMetaModel = metaModelOf[Array[Int]] rewrite metamodelRules {
+      case mm @ MetaModel(IntType) => mm.addConverter(Converter[Int, Option[String]]({ i => Some("x" + i.toString) }, _.get.toInt))
     } rewrite metamodelRules {
-      case mm @ Metamodel(StringType) => mm.convert(Converter[String, Int](_.substring(1).toInt, _.toString))
+      case mm @ MetaModel(StringType) => mm.addConverter(Converter[String, Int](_.substring(1).toInt, _.toString))
     }
 
-    testMetamodel.scalaType should equal(ArrayType(IntType))
-    testMetamodel.converter.to(Array(1)) should be(Array(Some(1)))
-    testMetamodel.converter.from(Array(Some(2))) should be(Array(2))
+    testMetaModel.scalaType should equal(ArrayType(IntType))
+    testMetaModel.converter.to(Array(1)) should be(Array(Some(1)))
+    testMetaModel.converter.from(Array(Some(2))) should be(Array(2))
 
-    testMetamodel.isInstanceOf[ConvertedMetamodel] should be(true)
-    val cv = testMetamodel.asInstanceOf[ConvertedMetamodel]
-    cv.visibleMetamodel.scalaType should be(ArrayType(OptionType(IntType)))
+    testMetaModel.isInstanceOf[ConvertedMetaModel] should be(true)
+    val cv = testMetaModel.asInstanceOf[ConvertedMetaModel]
+    cv.visibleMetaModel.scalaType should be(ArrayType(OptionType(IntType)))
   }
 }

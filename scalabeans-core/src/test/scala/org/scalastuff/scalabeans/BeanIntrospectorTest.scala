@@ -26,8 +26,8 @@ class BeanIntrospectorTest {
   def testConstructorParameters() {
     val bd = descriptorOf[NotConstructorPropertyBean]
 
-    assertTrue(bd("i").isInstanceOf[ConstructorParameter])
-    assertFalse(bd("s").isInstanceOf[ConstructorParameter])
+    assertTrue(bd.property("i").isInstanceOf[ConstructorParameter])
+    assertFalse(bd.property("s").isInstanceOf[ConstructorParameter])
   }
 
   @Test
@@ -36,7 +36,7 @@ class BeanIntrospectorTest {
 
     assertNotNull(bd)
     assertEquals(1, bd.properties.size)
-    assertNotNull(bd("i"))
+    assertNotNull(bd.property("i"))
   }
 
   @Test
@@ -45,9 +45,9 @@ class BeanIntrospectorTest {
 
     assertNotNull(bd)
     assertEquals(1, bd.properties.size)
-    assertNotNull(bd("i"))
-    assertTrue(bd("i").isInstanceOf[ConstructorParameter])
-    assertEquals(scalaTypeOf[Seq[Int]], bd("i").metamodel.scalaType)
+    assertNotNull(bd.property("i"))
+    assertTrue(bd.property("i").isInstanceOf[ConstructorParameter])
+    assertEquals(scalaTypeOf[Seq[Int]], bd.property("i").underlyingType)
   }
 }
 

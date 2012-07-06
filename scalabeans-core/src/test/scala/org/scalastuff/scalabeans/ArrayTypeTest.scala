@@ -23,13 +23,13 @@ class ArrayTypeTest {
   @Test
   def testBeanPropertyGenericType() {
     checkGenericArrayType(
-      descriptorOf[ArrayTestBean].apply("arr1").metamodel.scalaType)
+      descriptorOf[ArrayTestBean].property("arr1").visibleType)
   }
 
   @Test
   def testBeanPropertyType() {
     checkPrimitiveArrayType(
-      descriptorOf[ArrayTestBean].apply("arr2").metamodel.scalaType)
+      descriptorOf[ArrayTestBean].property("arr2").visibleType)
   }
 
   @Test

@@ -8,31 +8,31 @@ import java.lang.{ Enum => JEnum }
 object StandardConverterRules {
 
   val DateAsMilliseconds = metamodelRules {
-    case mm @ Metamodel(DateType) => mm.convert(StandardConverters.DateAsMilliseconds)
+    case mm @ MetaModel(DateType) => mm.addConverter(StandardConverters.DateAsMilliseconds)
   }
   
   val SqlDateAsString = metamodelRules {
-    case mm @ Metamodel(SqlDateType) => mm.convert(StandardConverters.SqlDateAsString)
+    case mm @ MetaModel(SqlDateType) => mm.addConverter(StandardConverters.SqlDateAsString)
   }
   
   val SqlTimestampAsString = metamodelRules {
-    case mm @ Metamodel(SqlTimestampType) => mm.convert(StandardConverters.SqlTimestampAsString)
+    case mm @ MetaModel(SqlTimestampType) => mm.addConverter(StandardConverters.SqlTimestampAsString)
   }
   
   val EnumAsName = metamodelRules {
-    case mm @ Metamodel(EnumType(enum)) => 
-      mm.convert(
+    case mm @ MetaModel(EnumType(enum)) => 
+      mm.addConverter(
           RuntimeConverter(
-              mm.visibleMetamodel.scalaType,
+              mm.visibleMetaModel.scalaType,
               StringType,
               new StandardConverters.EnumAsName(enum)))
   }
   
   val JavaEnumAsName = metamodelRules {
-    case mm @ Metamodel(JavaEnumType(values)) => 
-      mm.convert(
+    case mm @ MetaModel(JavaEnumType(values)) => 
+      mm.addConverter(
           RuntimeConverter(
-              mm.visibleMetamodel.scalaType,
+              mm.visibleMetaModel.scalaType,
               StringType,
               new StandardConverters.JavaEnumAsName(values)))
   }

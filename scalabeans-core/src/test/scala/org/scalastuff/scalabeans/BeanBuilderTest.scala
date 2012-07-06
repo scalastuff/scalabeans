@@ -47,10 +47,10 @@ class BeanBuilderTest {
     assertEquals(2, builder.mutableProperties.size)
     assertEquals(1, builder.lastMutablePropertyIndex)
 
-    builder.set(bd("p1"), "value1")
-    builder.set(bd("p2"), "value2")
-    builder.set(bd("p3"), "value3")
-    builder.set(bd("p4"), 10)
+    builder.set(bd.property("p1"), "value1")
+    builder.set(bd.property("p2"), "value2")
+    builder.set(bd.property("p3"), "value3")
+    builder.set(bd.property("p4"), 10)
 
     val result = builder.result().asInstanceOf[SubclassValsAndVarsInConstructorBean]
 
@@ -65,8 +65,8 @@ class BeanBuilderTest {
     val bd = descriptorOf[ValsAndVarsInConstructorBean]
     val builder = bd.newBuilder
 
-    builder.set(bd("p1"), "value1")
-    builder.set(bd("p2"), "value2")
+    builder.set(bd.property("p1"), "value1")
+    builder.set(bd.property("p2"), "value2")
 
     val result = builder.result().asInstanceOf[ValsAndVarsInConstructorBean]
 

@@ -26,6 +26,18 @@ trait ScalaType {
   def erasure: Class[_]
 
   def arguments: Seq[ScalaType]
+  
+  /**
+   * @return companion object (if any defined)
+   */
+  lazy val companion: Option[AnyRef] = try {
+    val cc = Class.forName(erasure.getName + "$")
+    Some(cc.getField("MODULE$").get(cc))
+  } catch {
+    case e =>
+      e.printStackTrace
+      None
+  }
 
   override def equals(other: Any) = other match {
     case that: ScalaType => erasure == that.erasure && arguments == that.arguments

@@ -16,18 +16,18 @@ trait JsonHandler {
 }
 
 object JsonHandler {
-  def apply(metamodel: Metamodel): JsonHandler = {
+  def apply(metamodel: MetaModel): JsonHandler = {
     metamodel match {
-      case cm @ ContainerMetamodel(elementMetamodel) => // also covers ContainerMetamodelWithConvertedElement 
+      case cm @ ContainerMetaModel(elementMetaModel) => // also covers ContainerMetaModelWithConvertedElement 
         cm.scalaType match {
-          case OptionType(_) => new OptionValueHandler(apply(elementMetamodel))
-          case _ => new ArrayValueHandler(apply(elementMetamodel), cm)
+          case OptionType(_) => new OptionValueHandler(apply(elementMetaModel))
+          case _ => new ArrayValueHandler(apply(elementMetaModel), cm)
         }
       
-      case cv: ConvertedMetamodel => 
-        new ConvertedValueHandler(apply(cv.visibleMetamodel), cv.converter)
+      case cv: ConvertedMetaModel => 
+        new ConvertedValueHandler(apply(cv.visibleMetaModel), cv.converter)
         
-      case ValueMetamodel(scalaType) =>
+      case ValueMetaModel(scalaType) =>
         scalaType match {
           case ByteType => ByteValueHandler
           case ShortType => ShortValueHandler
@@ -221,7 +221,7 @@ class OptionValueHandler(elementValueHandler: JsonHandler) extends JsonHandler {
   }
 }
 
-class ArrayValueHandler(elementValueHandler: JsonHandler, metamodel: ContainerMetamodel) extends JsonHandler {
+class ArrayValueHandler(elementValueHandler: JsonHandler, metamodel: ContainerMetaModel) extends JsonHandler {
   def parse(parser: JsonParser): Any = {
     if (parser.getCurrentToken != JsonToken.START_ARRAY)
       throw new UnexpectedTokenException(JsonToken.START_ARRAY.asString(), parser)
@@ -261,7 +261,7 @@ class BeanHandler(bd: BeanDescriptor) extends JsonHandler {
       fields.find(_.name.getValue() == fieldName) match {
         case Some(field) =>
           parser.nextToken()
-          builder.setUnderlying(field.propertyDescriptor, field.handler.parse(parser))
+          builder.set(field.propertyDescriptor, field.handler.parse(parser))
         case None =>
           throw new UnreadableInputException("unknown attribute %s found".format(parser.getCurrentName()), parser.getCurrentLocation())
       }
@@ -274,12 +274,12 @@ class BeanHandler(bd: BeanDescriptor) extends JsonHandler {
     generator.writeStartObject()
     for (field <- fields) {
       generator.writeFieldName(field.name)
-      field.handler.write(generator, field.propertyDescriptor.getUnderlying[Any](obj.asInstanceOf[AnyRef]))
+      field.handler.write(generator, field.propertyDescriptor.get[Any](obj.asInstanceOf[AnyRef]))
     }
     generator.writeEndObject()
   }
 
   private[this] lazy val fields =
     for (pd <- bd.properties if pd.isInstanceOf[DeserializablePropertyDescriptor])
-      yield Field(pd, JsonHandler(pd.metamodel), new SerializedString(pd.name))
+      yield Field(pd, JsonHandler(pd.typeMetaModel), new SerializedString(pd.name))
 }
