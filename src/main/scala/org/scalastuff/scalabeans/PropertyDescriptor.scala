@@ -97,6 +97,19 @@ trait ConstructorParameter extends DeserializablePropertyDescriptor {
    */
   def defaultValue: Option[() => Any]
 
+  def index: Int
+}
+
+trait FieldPropertyDescriptor extends PropertyDescriptor {
+  def field: Field
+}
+
+trait GetterPropertyDescriptor extends PropertyDescriptor {
+  def getter: Method
+}
+
+trait GetterSetterPropertyDescriptor extends GetterPropertyDescriptor {
+  def setter: Method
 }
 
 object PropertyDescriptor {
@@ -144,17 +157,17 @@ object PropertyDescriptor {
 
     def getterPropertyDescriptor(getter: Method, typeHint: Option[ScalaType], ctorParameterIndex: Int) = {
       if (ctorParameterIndex < 0) {
-        new GetterPropertyDescriptor(getter, typeHint)
+        new GetterPropertyDescriptorImpl(getter, typeHint)
       } else {
-        new GetterPropertyDescriptor(getter, typeHint) with ConstructorParameterImpl
+        new GetterPropertyDescriptorImpl(getter, typeHint) with ConstructorParameterImpl
       }
     }
 
     def getterSetterPropertyDescriptor(getter: Method, setter: Method, typeHint: Option[ScalaType], ctorParameterIndex: Int) = {
       if (ctorParameterIndex < 0) {
-        new GetterSetterPropertyDescriptor(getter, setter, typeHint) { def index = _index }
+        new GetterSetterPropertyDescriptorImpl(getter, setter, typeHint) { def index = _index }
       } else {
-        new GetterSetterPropertyDescriptor(getter, setter, typeHint) with ConstructorParameterImpl
+        new GetterSetterPropertyDescriptorImpl(getter, setter, typeHint) with ConstructorParameterImpl
       }
     }
 
@@ -162,7 +175,7 @@ object PropertyDescriptor {
     // Field Property Descriptors
     //
 
-    abstract class FieldPropertyDescriptor(field: Field, typeHint: Option[ScalaType] = None) extends PropertyDescriptorImpl {
+    abstract class FieldPropertyDescriptorImpl(val field: Field, typeHint: Option[ScalaType] = None) extends PropertyDescriptorImpl with FieldPropertyDescriptor {
       field.setAccessible(true)
 
       val name = field.getName
@@ -173,10 +186,10 @@ object PropertyDescriptor {
     }
 
     class ImmutableFieldPropertyDescriptor(field: Field, typeHint: Option[ScalaType])
-      extends FieldPropertyDescriptor(field, typeHint) with ImmutablePropertyDescriptor
+      extends FieldPropertyDescriptorImpl(field, typeHint) with ImmutablePropertyDescriptor
 
     abstract class MutableFieldPropertyDescriptor(field: Field, typeHint: Option[ScalaType])
-      extends FieldPropertyDescriptor(field, typeHint) with MutablePropertyDescriptor {
+      extends FieldPropertyDescriptorImpl(field, typeHint) with MutablePropertyDescriptor {
 
       def set(obj: AnyRef, value: Any) = field.set(obj, value)
     }
@@ -185,7 +198,7 @@ object PropertyDescriptor {
     // Method Property Descriptors
     //
 
-    abstract class MethodPropertyDescriptor(getter: Method, typeHint: Option[ScalaType] = None) extends PropertyDescriptorImpl {
+    abstract class MethodPropertyDescriptor(val getter: Method, typeHint: Option[ScalaType] = None) extends PropertyDescriptorImpl with GetterPropertyDescriptor {
       getter.setAccessible(true)
 
       val name = getter.getName
@@ -196,9 +209,9 @@ object PropertyDescriptor {
 
     }
 
-    class GetterPropertyDescriptor(getter: Method, typeHint: Option[ScalaType]) extends MethodPropertyDescriptor(getter, typeHint) with ImmutablePropertyDescriptor
+    class GetterPropertyDescriptorImpl(getter: Method, typeHint: Option[ScalaType]) extends MethodPropertyDescriptor(getter, typeHint) with ImmutablePropertyDescriptor
 
-    abstract class GetterSetterPropertyDescriptor(getter: Method, setter: Method, typeHint: Option[ScalaType]) extends MethodPropertyDescriptor(getter, typeHint) with MutablePropertyDescriptor {
+    abstract class GetterSetterPropertyDescriptorImpl(getter: Method, val setter: Method, typeHint: Option[ScalaType]) extends MethodPropertyDescriptor(getter, typeHint) with MutablePropertyDescriptor with GetterSetterPropertyDescriptor {
       setter.setAccessible(true)
 
       def set(obj: AnyRef, value: Any): Unit = setter.invoke(obj, value.asInstanceOf[AnyRef])
