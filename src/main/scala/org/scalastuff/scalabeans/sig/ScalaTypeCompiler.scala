@@ -153,6 +153,7 @@ class ScalaTypeCompiler(scalaType: ScalaType, classDecl: ClassDecl) {
     def getTypeDecl(t: Type): TypeDecl = t match {
       case tp: TypeProjection =>
         tp.parent match {
+          case ptp: TypeProjection => getTypeDecl(ptp)
           case st: SingletonType =>
             st.path match {
               case mp: MemberPath =>
